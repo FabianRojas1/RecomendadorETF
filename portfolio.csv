@@ -1,0 +1,26 @@
+ticker,quantity,entry_price,entry_date,broker,currency,current_value,pct_of_total_portfolio,asset_type,asset_subtype
+PALL,8.8269,78386.03,,Hapi,COP,702319.19,2.11%,Materias Primas,Materias Primas
+URA,3.99361,86626.63,,Hapi,COP,645063.96,1.94%,Sectorial,Energia
+BOTZ,7.02123,98544.71,,Hapi,COP,934176.89,2.81%,Crecimiento,Tecnologia
+QTUM,0.52356,323777.41,,Hapi,COP,306998.69,0.92%,Crecimiento,Tecnologia
+ITA,0.2483,682686.35,,Hapi,COP,202036.55,0.61%,Crecimiento,Tecnologia
+XLV,12.45192,500483.63,,Hapi,COP,6443547.6,19.37%,Defensiva,Salud
+LIT,3.85623,133492.28,,Hapi,COP,1080584.2,3.25%,Materias Primas,Materias Primas
+WTAI,1.91555,88494.78,,Hapi,COP,320387.07,0.96%,Crecimiento,Tecnologia
+PSCE,2.37267,144348.89,,Hapi,COP,461189.94,1.39%,Sectorial,Energia
+SOXX,0.58624,636968.66,,Hapi,COP,1328390.33,3.99%,Crecimiento,Tecnologia
+BKCH,1.64002,208834.53,,Hapi,COP,491114.88,1.48%,Crecimiento,Blockchain
+GLD,0.48815,1055945.72,,Hapi,COP,649492.16,1.95%,Materias Primas,Materias Primas
+QQQ,0.96618,2148368.48,,Hapi,COP,2466679.49,7.41%,Crecimiento,Tecnologia
+ARTY,3.17665,112019.58,,Hapi,COP,878409.26,2.64%,Crecimiento,Tecnologia
+REMX,1.73498,184323.76,,Hapi,COP,583415.14,1.75%,Materias Primas,Materias Primas
+IFRA,4.43951,155851.83,,Hapi,COP,964655.35,2.90%,Defensiva,Infraestructura
+VWO,1.95748,174965.73,,Hapi,COP,416665.79,1.25%,Crecimiento,Mercados Emergentes
+SPY,1.58753,1212565.27,,Hapi,COP,4088853.1,12.29%,Crecimiento,Indexado
+ASML,0.06688,2534417.08,,Hapi,COP,446348.56,1.34%,Crecimiento,Tecnologia
+IUITCO,21,367500021,,Trii,COP,3675000,11.05%,Crecimiento,Tecnologia
+IUFSCO,21,119700021,,Trii,COP,1197000,3.60%,Defensiva,Financiero
+IUESCO,5,1945005,,Trii,COP,194500,0.58%,Defensiva,Servicios Esenciales
+CSPXCO,1,27947201,,Trii,COP,2794720,8.40%,Crecimiento,Indexado
+BACCO,5,9740005,,Trii,COP,974000,2.93%,Defensiva,Financiero
+AAPLCO,1,10247001,,Trii,COP,1024700,3.08%,Crecimiento,Tecnologia

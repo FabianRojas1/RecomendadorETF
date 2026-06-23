@@ -1,0 +1,19 @@
+# 1. Instalar dependencias
+pip install -r requirements.txt
+
+# 2. Verificar que el bot de Telegram funciona
+python main.py --test
+
+# 3. Correr el análisis ahora mismo (envía reporte a Telegram)
+python main.py --now
+
+# 4. Dejar corriendo en background
+python main.py
+
+
+cd recomendador-inversiones   # tu carpeta del proyecto
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/FabianRojas1/RecomendadorETF.git
+git push -u origin main
