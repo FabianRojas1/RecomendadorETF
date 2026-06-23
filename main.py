@@ -35,7 +35,6 @@ from src.telegram_bot   import send_weekly_report, send_test_message, send_price
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID",   "")
-NEWS_KEY  = os.getenv("NEWS_API_KEY",        "")
 
 
 # ── ANÁLISIS SEMANAL ──────────────────────────────────────────────────────────
@@ -47,7 +46,7 @@ async def run_weekly_analysis():
     config       = Config()
     loader       = DataLoader(config)
     scorer       = ScoringEngine()
-    news_a       = NewsAnalyzer(api_key=NEWS_KEY)
+    news_a       = NewsAnalyzer(config)
     cop_rate     = loader.get_cop_usd_rate()
     portfolio    = loader.load_portfolio()
 
