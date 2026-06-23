@@ -14,6 +14,6 @@ python main.py
 cd recomendador-inversiones   # tu carpeta del proyecto
 git init
 git add .
-git commit -m "Initial commit"
+git commit -m "commit inicial bot RecomendadorETF"
 git remote add origin https://github.com/FabianRojas1/RecomendadorETF.git
-git push -u origin main
+git push -u origin master

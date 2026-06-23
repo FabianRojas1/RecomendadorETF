@@ -1,73 +1,46 @@
 """
-pdf_generator.py — Genera el PDF de reporte semanal completo.
-Usa fpdf2. Instalar: pip install fpdf2
+pdf_generator.py — Reporte PDF usando matplotlib (ya en requirements.txt).
+Sin dependencias nuevas. Usa matplotlib.backends.backend_pdf.PdfPages.
 """
 import logging
+import textwrap
 from datetime import datetime
 from typing import List, Dict, Any
 
+import matplotlib
+matplotlib.use("Agg")   # Sin GUI — funciona en servidores y GitHub Actions
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.backends.backend_pdf import PdfPages
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
-try:
-    from fpdf import FPDF, XPos, YPos
-    FPDF_OK = True
-except ImportError:
-    FPDF_OK = False
-    FPDF = object  # fallback so class definition below doesn't raise NameError
-    XPos = None
-    YPos = None
-    logger.warning("fpdf2 not installed. Run: pip install fpdf2")
-
-
-ACTION_COLORS = {
-    "COMPRA FUERTE": (0,   128,  0),
-    "COMPRA":        (34,  139, 34),
-    "MANTENER":      (100, 100, 100),
-    "VENTA":         (200,  80,  0),
-    "VENTA FUERTE":  (180,   0,  0),
+# ── Paleta de colores ─────────────────────────────────────────────────────────
+COLORS = {
+    "COMPRA FUERTE": "#1a7a1a",
+    "COMPRA":        "#2ea82e",
+    "COMPRA DEBIL":  "#7ec87e",
+    "MANTENER":      "#888888",
+    "VENTA DEBIL":   "#e08050",
+    "VENTA":         "#d05000",
+    "VENTA FUERTE":  "#b00000",
+    "bg_header":     "#1e1e4a",
+    "bg_light":      "#f0f0f8",
+    "text_dark":     "#1a1a1a",
+    "text_gray":     "#555555",
+    "green":         "#1a7a1a",
+    "red":           "#b00000",
+    "neutral":       "#555555",
 }
 
 INDICATOR_LABELS = {
-    "moving_averages": "Medias Moviles (diario)",
+    "moving_averages": "Medias Moviles EMA10/55 (diario)",
+    "squeeze_adx":     "Squeeze+ADX Trading Latino (semanal)",
     "rsi":             "RSI 14 (semanal)",
-    "squeeze":         "Squeeze Momentum (semanal)",
-    "adx":             "ADX 14 (semanal)",
     "volume":          "Volumen OBV/CMF (diario)",
-    "news":            "Contexto Noticias",
+    "news":            "Noticias / Contexto",
 }
-
-
-class ReportPDF(FPDF):
-    def __init__(self):
-        super().__init__()
-        self.set_auto_page_break(auto=True, margin=15)
-        self.set_margins(12, 12, 12)
-
-    def header(self):
-        self.set_font("Helvetica", "B", 9)
-        self.set_text_color(80, 80, 80)
-        self.cell(0, 6, f"Analisis Semanal de Inversiones | {datetime.now().strftime('%d/%m/%Y')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_draw_color(180, 180, 180)
-        self.line(12, self.get_y(), 198, self.get_y())
-        self.ln(2)
-
-    def footer(self):
-        self.set_y(-13)
-        self.set_font("Helvetica", "I", 7)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 5, f"Pagina {self.page_no()} | Generado automaticamente. No es asesoría financiera.", align="C")
-
-
-def _safe(text, maxlen=200):
-    """Limpia texto para fpdf (ASCII safe)."""
-    if not text:
-        return ""
-    text = str(text)
-    text = text.replace("✅", "[OK]").replace("⚠️", "[!]").replace("❌", "[X]")
-    text = text.replace("🟢", "[+]").replace("🔴", "[-]").replace("⚡", "[*]")
-    text = text.replace("•", "-").replace("→", "->").replace("←", "<-")
-    text = text.encode("latin-1", errors="replace").decode("latin-1")
-    return text[:maxlen] if maxlen else text
 
 
 def generate_report_pdf(
@@ -77,84 +50,70 @@ def generate_report_pdf(
     output_path: str,
 ) -> bool:
     """
-    Genera el PDF con análisis completo de todos los activos.
-
-    Args:
-        recommendations : lista de dicts de scoring.generate_recommendation()
-        portfolio_total_cop : valor total del portafolio en COP
-        cop_usd_rate : tasa COP/USD
-        output_path : ruta .pdf de salida
-
-    Returns:
-        True si éxito, False si error
+    Genera el PDF completo del reporte semanal usando matplotlib.
+    No requiere fpdf2 ni reportlab — matplotlib ya está en requirements.txt.
     """
-    if not FPDF_OK:
-        logger.error("fpdf2 not available. Cannot generate PDF.")
-        return False
-
     try:
-        pdf = ReportPDF()
-        pdf.add_page()
+        plt.rcParams.update({
+            "font.family":    "DejaVu Sans",
+            "font.size":      9,
+            "figure.facecolor": "white",
+            "axes.facecolor":   "white",
+        })
 
-        # ── PORTADA ──────────────────────────────────────────────────────────
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.set_text_color(30, 30, 30)
-        pdf.cell(0, 10, "Reporte Semanal de Inversiones", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.set_font("Helvetica", "", 11)
-        pdf.set_text_color(80, 80, 80)
-        pdf.cell(0, 7, datetime.now().strftime("Semana del %d de %B de %Y"), new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
-        pdf.ln(6)
+        compras  = sorted([r for r in recommendations if "COMPRA" in r.get("action","")],
+                          key=lambda x: -x.get("score", 0))
+        ventas   = sorted([r for r in recommendations if "VENTA"  in r.get("action","")],
+                          key=lambda x:  x.get("score", 0))
+        mantener = sorted([r for r in recommendations if "MANTENER" in r.get("action","")],
+                          key=lambda x: -abs(x.get("score", 0)))
 
-        # ── RESUMEN PORTAFOLIO ────────────────────────────────────────────────
-        pdf.set_fill_color(240, 240, 248)
-        pdf.set_draw_color(200, 200, 220)
-        pdf.rect(12, pdf.get_y(), 186, 22, "FD")
-        pdf.set_xy(16, pdf.get_y() + 3)
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_text_color(30, 30, 80)
-        pdf.cell(90, 6, f"Portfolio total: COP ${portfolio_total_cop:,.0f}", new_x=XPos.RIGHT)
-        pdf.cell(90, 6, f"Tasa USD/COP: {cop_usd_rate:,.0f}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="R")
-        pdf.set_x(16)
-        pdf.set_font("Helvetica", "", 9)
+        with PdfPages(output_path) as pdf:
+            # Portada
+            pdf.savefig(_make_cover(recommendations, portfolio_total_cop, cop_usd_rate,
+                                    len(compras), len(ventas), len(mantener)),
+                        bbox_inches="tight")
+            plt.close("all")
 
-        # contar señales
-        compras   = [r for r in recommendations if "COMPRA" in r.get("action", "")]
-        ventas    = [r for r in recommendations if "VENTA"  in r.get("action", "")]
-        mantener  = [r for r in recommendations if "MANTENER" in r.get("action", "")]
-        pdf.set_text_color(0, 120, 0)
-        pdf.cell(60, 5, f"Compras: {len(compras)}", new_x=XPos.RIGHT)
-        pdf.set_text_color(180, 0, 0)
-        pdf.cell(60, 5, f"Ventas: {len(ventas)}", new_x=XPos.RIGHT)
-        pdf.set_text_color(80, 80, 80)
-        pdf.cell(60, 5, f"Mantener: {len(mantener)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(8)
+            # Sección COMPRAS
+            if compras:
+                pdf.savefig(_make_section_header("COMPRAS", compras, COLORS["COMPRA FUERTE"]),
+                            bbox_inches="tight")
+                plt.close("all")
+                for rec in compras:
+                    pdf.savefig(_make_ticker_page(rec), bbox_inches="tight")
+                    plt.close("all")
 
-        # ── SECCIONES ─────────────────────────────────────────────────────────
-        groups = [
-            ("COMPRAS", sorted(compras,  key=lambda r: r.get("score",0), reverse=True)),
-            ("VENTAS",  sorted(ventas,   key=lambda r: r.get("score",0))),
-            ("MANTENER",sorted(mantener, key=lambda r: abs(r.get("score",0)), reverse=True)),
-        ]
+            # Sección VENTAS
+            if ventas:
+                pdf.savefig(_make_section_header("VENTAS", ventas, COLORS["VENTA FUERTE"]),
+                            bbox_inches="tight")
+                plt.close("all")
+                for rec in ventas:
+                    pdf.savefig(_make_ticker_page(rec), bbox_inches="tight")
+                    plt.close("all")
 
-        for section_title, recs in groups:
-            if not recs:
-                continue
-            _section_header(pdf, section_title)
-            for rec in recs:
-                _ticker_block(pdf, rec)
+            # MANTENER (resumen compacto)
+            if mantener:
+                pdf.savefig(_make_mantener_page(mantener), bbox_inches="tight")
+                plt.close("all")
 
-        # ── NOTICIAS ──────────────────────────────────────────────────────────
-        all_news = []
-        for r in recommendations:
-            for n in r.get("news", []):
-                n["ticker"] = r.get("ticker", "")
-                all_news.append(n)
+            # Noticias
+            all_news = []
+            for r in recommendations:
+                for n in r.get("news", []):
+                    n["ticker"] = r.get("ticker", "")
+                    all_news.append(n)
+            if all_news:
+                for fig in _make_news_pages(all_news):
+                    pdf.savefig(fig, bbox_inches="tight")
+                    plt.close("all")
 
-        if all_news:
-            _section_header(pdf, "NOTICIAS Y CONTEXTO GEOPOLITICO")
-            _news_section(pdf, all_news)
+            # Metadata
+            d = pdf.infodict()
+            d["Title"]   = "Reporte Semanal de Inversiones"
+            d["Subject"] = f"Análisis {datetime.now().strftime('%d/%m/%Y')}"
 
-        pdf.output(output_path)
         logger.info("PDF generado: %s", output_path)
         return True
 
@@ -163,121 +122,327 @@ def generate_report_pdf(
         return False
 
 
-# ── Helpers de renderizado ────────────────────────────────────────────────────
+# ── Páginas ───────────────────────────────────────────────────────────────────
 
-def _section_header(pdf: "ReportPDF", title: str):
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_fill_color(30, 30, 80)
-    pdf.cell(0, 8, f"  {title}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
-    pdf.ln(3)
+def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant):
+    fig, ax = plt.subplots(figsize=(8.5, 11))
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+    fig.patch.set_facecolor("white")
+
+    # Header band
+    ax.add_patch(mpatches.FancyBboxPatch((0, 0.82), 1, 0.18,
+                 boxstyle="square,pad=0", fc=COLORS["bg_header"], ec="none"))
+    ax.text(0.5, 0.93, "Reporte Semanal de Inversiones",
+            ha="center", va="center", fontsize=20, fontweight="bold",
+            color="white", transform=ax.transAxes)
+    ax.text(0.5, 0.86, datetime.now().strftime("%A %d de %B de %Y"),
+            ha="center", va="center", fontsize=12, color="#aaaadd",
+            transform=ax.transAxes)
+
+    # Portfolio summary box
+    ax.add_patch(mpatches.FancyBboxPatch((0.05, 0.65), 0.90, 0.14,
+                 boxstyle="round,pad=0.01", fc=COLORS["bg_light"], ec="#cccccc"))
+    ax.text(0.5, 0.75, f"Portfolio Total:  COP ${total_cop:,.0f}",
+            ha="center", va="center", fontsize=13, fontweight="bold",
+            color=COLORS["text_dark"], transform=ax.transAxes)
+    ax.text(0.5, 0.70, f"Tasa USD/COP: {cop_rate:,.0f}  |  Activos analizados: {len(recs)}",
+            ha="center", va="center", fontsize=10, color=COLORS["text_gray"],
+            transform=ax.transAxes)
+
+    # Signal summary
+    for i, (label, n, color) in enumerate([
+        ("COMPRAS", n_comp, COLORS["COMPRA"]),
+        ("VENTAS",  n_vent, COLORS["VENTA"]),
+        ("MANTENER",n_mant, COLORS["MANTENER"]),
+    ]):
+        x = 0.18 + i * 0.32
+        ax.add_patch(mpatches.FancyBboxPatch((x - 0.12, 0.50), 0.24, 0.12,
+                     boxstyle="round,pad=0.01", fc=color, ec="none", alpha=0.9))
+        ax.text(x, 0.59, str(n),    ha="center", va="center",
+                fontsize=22, fontweight="bold", color="white", transform=ax.transAxes)
+        ax.text(x, 0.52, label, ha="center", va="center",
+                fontsize=9, color="white", transform=ax.transAxes)
+
+    # Methodology note
+    note = (
+        "Metodología: EMA 10/55 diario · Squeeze Momentum LazyBear semanal (Trading Latino)\n"
+        "ADX 14 semanal · RSI 14 semanal · OBV/VWAP/CMF diario · Noticias NewsAPI\n\n"
+        "Señal de COMPRA: Squeeze liberado + histograma verde subiendo + ADX > 25 + DI+ > DI-\n"
+        "Señal de VENTA:  Squeeze liberado + histograma rojo bajando  + ADX > 25 + DI- > DI+"
+    )
+    ax.text(0.5, 0.37, note, ha="center", va="center", fontsize=8.5,
+            color=COLORS["text_gray"], transform=ax.transAxes,
+            linespacing=1.6, bbox=dict(fc="#f8f8ff", ec="#ddddee", pad=8))
+
+    ax.text(0.5, 0.05,
+            "Este reporte es generado automáticamente. No constituye asesoría financiera.\n"
+            "Siempre realiza tu propio análisis antes de tomar decisiones de inversión.",
+            ha="center", va="center", fontsize=7.5, color="#999999",
+            transform=ax.transAxes, linespacing=1.5)
+    return fig
 
 
-def _ticker_block(pdf: "ReportPDF", rec: dict):
-    ticker  = _safe(rec.get("ticker", "-"))
-    action  = _safe(rec.get("action", "-"))
+def _make_section_header(title, recs, color):
+    fig, ax = plt.subplots(figsize=(8.5, 4))
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+    fig.patch.set_facecolor("white")
+
+    ax.add_patch(mpatches.FancyBboxPatch((0, 0.55), 1, 0.45,
+                 boxstyle="square,pad=0", fc=color, ec="none"))
+    ax.text(0.5, 0.78, f"SECCIÓN: {title}", ha="center", va="center",
+            fontsize=22, fontweight="bold", color="white", transform=ax.transAxes)
+    ax.text(0.5, 0.62, f"{len(recs)} activo(s) con señal",
+            ha="center", va="center", fontsize=12, color="white", alpha=0.85,
+            transform=ax.transAxes)
+
+    # Mini tabla de resumen
+    col_labels = ["Ticker", "Score", "Precio USD", "Target", "Stop Loss"]
+    rows = []
+    for r in recs[:10]:
+        rows.append([
+            r.get("ticker", ""),
+            f"{r.get('score', 0):+.1f}",
+            f"${r.get('price_usd', 0):.2f}",
+            f"${r.get('target_usd') or 0:.2f}" if r.get("target_usd") else "—",
+            f"${r.get('stop_loss_usd') or 0:.2f}" if r.get("stop_loss_usd") else "—",
+        ])
+
+    if rows:
+        tbl = ax.table(cellText=rows, colLabels=col_labels,
+                       loc="center", bbox=[0.02, -0.05, 0.96, 0.48])
+        tbl.auto_set_font_size(False); tbl.set_fontsize(8)
+        for (r, c), cell in tbl.get_celld().items():
+            if r == 0:
+                cell.set_facecolor("#eeeeee"); cell.set_text_props(fontweight="bold")
+            else:
+                cell.set_facecolor("white" if r % 2 == 0 else "#fafafa")
+            cell.set_edgecolor("#dddddd")
+
+    return fig
+
+
+def _make_ticker_page(rec: dict):
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    ticker  = rec.get("ticker", "—")
+    action  = rec.get("action", "—")
     score   = rec.get("score", 0)
-    price   = rec.get("price_usd") or 0
-    target  = rec.get("target_usd") or 0
-    sl      = rec.get("stop_loss_usd") or 0
-    conf    = rec.get("confidence", {}).get("score", 0)
-    conf_t  = rec.get("confidence", {}).get("total", 6)
-    reasons = rec.get("reasons", [])
+    price   = rec.get("price_usd", 0)
+    target  = rec.get("target_usd")
+    sl      = rec.get("stop_loss_usd")
+    conf    = rec.get("confidence", {})
     comps   = rec.get("score_components", {})
+    reasons = rec.get("reasons", [])
+    color   = COLORS.get(action, COLORS["MANTENER"])
 
-    r, g, b = ACTION_COLORS.get(action, (60, 60, 60))
+    # Trading Latino extras
+    sq_state   = rec.get("squeeze_state", "")
+    sqzm_color = rec.get("sqzm_color", "")
+    sqzm_valley= rec.get("sqzm_valley", False)
+    sqzm_peak  = rec.get("sqzm_peak",   False)
+    adx_v      = rec.get("adx_value", 0)
+    rsi_v      = rec.get("rsi_value", 0)
 
-    # Ticker header bar
-    pdf.set_fill_color(r, g, b)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 7, f"  {ticker}  |  {action}  |  Score: {score:+.1f}/40  |  Confianza: {conf}/{conf_t}",
-             new_x=XPos.LMARGIN, new_y=YPos.NEXT, fill=True)
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.91, 1, 0.09])
+    ax_h.set_xlim(0, 1); ax_h.set_ylim(0, 1); ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=color, ec="none"))
+    ax_h.text(0.03, 0.65, ticker, fontsize=20, fontweight="bold",
+              color="white", va="center")
+    ax_h.text(0.03, 0.22, action, fontsize=11, color="white", alpha=0.9, va="center")
+    ax_h.text(0.97, 0.65, f"Score: {score:+.1f}/40", fontsize=14,
+              fontweight="bold", color="white", va="center", ha="right")
+    ax_h.text(0.97, 0.22,
+              f"Confianza: {conf.get('score',0)}/{conf.get('total',5)}",
+              fontsize=9, color="white", alpha=0.85, va="center", ha="right")
 
-    # Price row
-    pdf.set_text_color(30, 30, 30)
-    pdf.set_font("Helvetica", "", 9)
-    price_line = f"Precio: ${price:.2f} USD"
-    if target:  price_line += f"   |   Target: ${target:.2f}"
-    if sl:      price_line += f"   |   Stop Loss: ${sl:.2f}"
-    pdf.cell(0, 5, _safe(price_line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    # ── Precios ───────────────────────────────────────────────────────────────
+    ax_p = fig.add_axes([0, 0.83, 1, 0.08])
+    ax_p.set_xlim(0, 1); ax_p.set_ylim(0, 1); ax_p.axis("off")
+    ax_p.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=COLORS["bg_light"], ec="#cccccc",
+                   linewidth=0.5))
+    price_str = f"Precio: ${price:.2f} USD"
+    if target: price_str += f"   |   Target: ${target:.2f}"
+    if sl:     price_str += f"   |   Stop Loss: ${sl:.2f}"
+    ax_p.text(0.5, 0.6, price_str, ha="center", va="center",
+              fontsize=10.5, fontweight="bold", color=COLORS["text_dark"])
 
-    # Indicator breakdown table
-    if comps:
-        _indicator_table(pdf, comps)
+    # ── Bloque Trading Latino ─────────────────────────────────────────────────
+    ax_tl = fig.add_axes([0.02, 0.71, 0.96, 0.11])
+    ax_tl.set_xlim(0, 1); ax_tl.set_ylim(0, 1); ax_tl.axis("off")
+    ax_tl.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                    boxstyle="round,pad=0.02", fc="#fffbe6", ec="#e0c040", linewidth=0.8))
+    ax_tl.text(0.5, 0.85, "⚡ Estrategia Trading Latino (semanal)",
+               ha="center", va="center", fontsize=9.5, fontweight="bold",
+               color="#7a6000")
 
-    # Reasons
+    # Estado del Squeeze
+    sq_label  = {"compressed": "COMPRIMIDO (acumulando presion)",
+                 "released":   "LIBERADO (energia en movimiento)",
+                 "expanding":  "EXPANDIENDO"}.get(sq_state, sq_state.upper())
+    hist_label = {
+        "green_strong": "VERDE SUBIENDO  — momentum alcista creciente",
+        "green_weak":   "VERDE DEBILITANDO — momentum alcista perdiendo fuerza",
+        "red_strong":   "ROJO BAJANDO  — momentum bajista creciente",
+        "red_weak":     "ROJO DEBILITANDO  — momentum bajista perdiendo fuerza",
+    }.get(sqzm_color, sqzm_color)
+
+    entry_tag = ""
+    if sqzm_valley: entry_tag = "  >>> ENTRADA VALLE (señal optima de compra)"
+    if sqzm_peak:   entry_tag = "  >>> ENTRADA PICO  (señal optima de venta)"
+
+    tl_line1 = f"Squeeze: {sq_label}"
+    tl_line2 = f"Histograma: {hist_label}{entry_tag}"
+    tl_line3 = f"ADX: {adx_v:.1f} {'(tendencia fuerte)' if adx_v >= 25 else '(tendencia debil)'}   |   RSI semanal: {rsi_v:.1f}"
+
+    for y, txt, fs in [(0.62, tl_line1, 8.5), (0.40, tl_line2, 8.5), (0.16, tl_line3, 8.5)]:
+        ax_tl.text(0.02, y, txt, va="center", fontsize=fs, color="#5a4000")
+
+    # ── Tabla de indicadores ──────────────────────────────────────────────────
+    ax_t = fig.add_axes([0.02, 0.38, 0.96, 0.32])
+    ax_t.set_xlim(0, 1); ax_t.set_ylim(0, 1); ax_t.axis("off")
+    ax_t.text(0, 0.97, "Desglose de indicadores:", fontsize=9.5,
+              fontweight="bold", color=COLORS["text_dark"], va="top")
+
+    rows, row_colors = [], []
+    for key, comp in comps.items():
+        label   = INDICATOR_LABELS.get(key, key)
+        pts     = comp.get("weighted_score", 0)
+        signal  = comp.get("signal", "—")
+        details = comp.get("details", "")
+        rows.append([label, f"{pts:+.1f}", signal,
+                     textwrap.shorten(details, width=55, placeholder="...")])
+        rc = "#e8f5e8" if pts > 0 else "#fde8e8" if pts < 0 else "#f5f5f5"
+        row_colors.append([rc, rc, rc, rc])
+
+    if rows:
+        tbl = ax_t.table(
+            cellText=rows,
+            colLabels=["Indicador", "Pts", "Señal", "Detalle"],
+            cellColours=row_colors + [["#eeeeee"]*4],
+            loc="center", bbox=[0, 0, 1, 0.90],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(8)
+        tbl.auto_set_column_width([0, 1, 2, 3])
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#ddddee")
+                cell.set_text_props(fontweight="bold")
+
+    # ── Razones ───────────────────────────────────────────────────────────────
     if reasons:
-        pdf.set_font("Helvetica", "I", 8)
-        pdf.set_text_color(60, 60, 60)
-        for reason in reasons[:3]:
-            pdf.cell(6); pdf.cell(0, 4, _safe(f"- {reason}"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        ax_r = fig.add_axes([0.02, 0.18, 0.96, 0.19])
+        ax_r.set_xlim(0, 1); ax_r.set_ylim(0, 1); ax_r.axis("off")
+        ax_r.text(0, 0.97, "Resumen de señales:", fontsize=9.5,
+                  fontweight="bold", color=COLORS["text_dark"], va="top")
+        for i, reason in enumerate(reasons[:5]):
+            col = COLORS["green"] if reason.startswith("[+]") else \
+                  COLORS["red"]   if reason.startswith("[-]") else COLORS["neutral"]
+            ax_r.text(0.02, 0.80 - i * 0.18, reason, fontsize=8.5,
+                      color=col, va="center")
 
-    pdf.ln(4)
-
-
-def _indicator_table(pdf: "ReportPDF", comps: dict):
-    col_w = [80, 30, 60]
-    headers = ["Indicador", "Pts", "Señal"]
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(230, 230, 240)
-    pdf.set_text_color(30, 30, 30)
-    for h, w in zip(headers, col_w):
-        pdf.cell(w, 5, h, border="B", align="C")
-    pdf.ln()
-
-    pdf.set_font("Helvetica", "", 8)
-    for key, data in comps.items():
-        label  = _safe(INDICATOR_LABELS.get(key, key), 40)
-        pts    = data.get("weighted_score", 0) if isinstance(data, dict) else 0
-        signal = _safe(data.get("signal", "-") if isinstance(data, dict) else "-", 30)
-
-        color = (0, 110, 0) if pts > 0 else (180, 0, 0) if pts < 0 else (80, 80, 80)
-        pdf.set_text_color(*color)
-        pdf.cell(col_w[0], 5, f"  {label}")
-        pdf.cell(col_w[1], 5, f"{pts:+.1f}", align="C")
-        pdf.set_text_color(30, 30, 30)
-        pdf.cell(col_w[2], 5, f"  {signal}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-    pdf.ln(1)
+    # ── Footer ────────────────────────────────────────────────────────────────
+    ax_f = fig.add_axes([0, 0, 1, 0.05])
+    ax_f.set_xlim(0, 1); ax_f.set_ylim(0, 1); ax_f.axis("off")
+    ax_f.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc="#f0f0f0", ec="none"))
+    ax_f.text(0.5, 0.5,
+              f"Generado {datetime.now().strftime('%d/%m/%Y %H:%M')} | "
+              "No constituye asesoría financiera",
+              ha="center", va="center", fontsize=7, color="#999999")
+    return fig
 
 
-def _news_section(pdf: "ReportPDF", news_list: list):
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(30, 30, 30)
+def _make_mantener_page(mantener: list):
+    fig, ax = plt.subplots(figsize=(8.5, 11))
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+    fig.patch.set_facecolor("white")
 
-    SENT_COLORS = {
-        "positive": (0, 120, 0),
-        "negative": (180, 0, 0),
-        "neutral":  (80, 80, 80),
-    }
-    SENT_LABEL = {"positive": "[+]", "negative": "[-]", "neutral": "[ ]"}
+    ax.add_patch(mpatches.FancyBboxPatch((0, 0.92), 1, 0.08,
+                 boxstyle="square,pad=0", fc=COLORS["MANTENER"], ec="none"))
+    ax.text(0.5, 0.96, f"MANTENER — {len(mantener)} activos",
+            ha="center", va="center", fontsize=16, fontweight="bold",
+            color="white", transform=ax.transAxes)
 
-    for item in news_list[:40]:
-        ticker    = _safe(item.get("ticker", ""))
-        title     = _safe(item.get("title", "Sin título"), 120)
-        source    = _safe(item.get("source", ""), 30)
-        sentiment = item.get("sentiment", "neutral")
-        url       = item.get("url", "")
+    rows = []
+    for r in mantener:
+        sq = r.get("squeeze_state", "")
+        sc = r.get("sqzm_color",    "")
+        rows.append([
+            r.get("ticker", ""),
+            f"{r.get('score', 0):+.1f}",
+            f"${r.get('price_usd', 0):.2f}",
+            sq,
+            sc,
+            r.get("asset_subtype", ""),
+        ])
 
-        sl = SENT_LABEL.get(sentiment, "[ ]")
-        r, g, b = SENT_COLORS.get(sentiment, (80, 80, 80))
+    if rows:
+        tbl = ax.table(
+            cellText=rows,
+            colLabels=["Ticker", "Score", "Precio", "Squeeze", "SQZM Color", "Sector"],
+            loc="center", bbox=[0.02, 0.10, 0.96, 0.80],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(8.5)
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#eeeeee"); cell.set_text_props(fontweight="bold")
+            else:
+                cell.set_facecolor("white" if r % 2 == 0 else "#fafafa")
+    return fig
 
-        pdf.set_text_color(r, g, b)
-        prefix = f"{sl} [{ticker}] "
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.cell(len(prefix)*2.1, 4, prefix, new_x=XPos.RIGHT)
 
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(30, 30, 30)
-        line = title
-        if source:
-            line += f"  ({source})"
-        pdf.multi_cell(0, 4, _safe(line, 160), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+def _make_news_pages(news_list: list):
+    figs   = []
+    chunks = [news_list[i:i+20] for i in range(0, len(news_list), 20)]
 
-        if url:
-            pdf.set_font("Helvetica", "I", 7)
-            pdf.set_text_color(0, 80, 180)
-            pdf.cell(10)
-            pdf.cell(0, 3, _safe(url, 120), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_text_color(30, 30, 30)
+    SENT_COLORS = {"positive": COLORS["green"], "negative": COLORS["red"],
+                   "neutral":  COLORS["neutral"]}
+    SENT_ICONS  = {"positive": "[+]", "negative": "[-]", "neutral": "[ ]"}
+
+    for page_num, chunk in enumerate(chunks):
+        fig, ax = plt.subplots(figsize=(8.5, 11))
+        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+        fig.patch.set_facecolor("white")
+
+        ax.add_patch(mpatches.FancyBboxPatch((0, 0.92), 1, 0.08,
+                     boxstyle="square,pad=0", fc=COLORS["bg_header"], ec="none"))
+        ax.text(0.5, 0.96, f"Noticias y Contexto (pag. {page_num+1}/{len(chunks)})",
+                ha="center", va="center", fontsize=14, fontweight="bold",
+                color="white", transform=ax.transAxes)
+
+        y = 0.87
+        for item in chunk:
+            sentiment = item.get("sentiment", "neutral")
+            icon  = SENT_ICONS.get(sentiment, "[ ]")
+            color = SENT_COLORS.get(sentiment, COLORS["neutral"])
+            ticker = item.get("ticker", "")
+            title  = item.get("title",  "Sin título")
+            source = item.get("source", "")
+            url    = item.get("url",    "")
+
+            ax.text(0.02, y, f"{icon} [{ticker}]", fontsize=8,
+                    fontweight="bold", color=color, va="top")
+            short_title = textwrap.shorten(title, width=90, placeholder="...")
+            ax.text(0.13, y, short_title, fontsize=8, color=COLORS["text_dark"], va="top")
+            if source:
+                ax.text(0.13, y - 0.022, f"  {source}", fontsize=7,
+                        color=COLORS["text_gray"], va="top", style="italic")
+            if url:
+                ax.text(0.13, y - 0.038,
+                        textwrap.shorten(url, width=90, placeholder="..."),
+                        fontsize=6.5, color="#0044aa", va="top")
+                y -= 0.052
+            else:
+                y -= 0.040
+
+            if y < 0.05:
+                break
+
+        figs.append(fig)
+    return figs
