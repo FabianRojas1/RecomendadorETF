@@ -46,7 +46,7 @@ class ReportPDF(FPDF):
     def header(self):
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(80, 80, 80)
-        self.cell(0, 6, f"Analisis Semanal de Inversiones — {datetime.now().strftime('%d/%m/%Y')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(0, 6, f"Analisis Semanal de Inversiones | {datetime.now().strftime('%d/%m/%Y')}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_draw_color(180, 180, 180)
         self.line(12, self.get_y(), 198, self.get_y())
         self.ln(2)
@@ -174,8 +174,8 @@ def _section_header(pdf: "ReportPDF", title: str):
 
 
 def _ticker_block(pdf: "ReportPDF", rec: dict):
-    ticker  = _safe(rec.get("ticker", "—"))
-    action  = _safe(rec.get("action", "—"))
+    ticker  = _safe(rec.get("ticker", "-"))
+    action  = _safe(rec.get("action", "-"))
     score   = rec.get("score", 0)
     price   = rec.get("price_usd") or 0
     target  = rec.get("target_usd") or 0
@@ -230,7 +230,7 @@ def _indicator_table(pdf: "ReportPDF", comps: dict):
     for key, data in comps.items():
         label  = _safe(INDICATOR_LABELS.get(key, key), 40)
         pts    = data.get("weighted_score", 0) if isinstance(data, dict) else 0
-        signal = _safe(data.get("signal", "—") if isinstance(data, dict) else "—", 30)
+        signal = _safe(data.get("signal", "-") if isinstance(data, dict) else "-", 30)
 
         color = (0, 110, 0) if pts > 0 else (180, 0, 0) if pts < 0 else (80, 80, 80)
         pdf.set_text_color(*color)
