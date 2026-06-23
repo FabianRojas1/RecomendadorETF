@@ -103,17 +103,18 @@ class DataLoader:
             logger.warning("Could not fetch COP/USD rate: %s", e)
         return self.config.DEFAULT_COP_USD_RATE
 
-    def download_history(self, ticker: str) -> pd.DataFrame:
+    def download_history(self, ticker: str, period: str = None) -> pd.DataFrame:
         """
         Download price history from yfinance.
         Returns DataFrame with columns [Open, High, Low, Close, Volume].
         Returns empty DataFrame on failure.
         """
         yf_ticker = self.get_yf_ticker(ticker)
+        dl_period = period if period else f"{self.config.HISTORY_DAYS}d"
         try:
             df = yf.download(
                 yf_ticker,
-                period=f"{self.config.HISTORY_DAYS}d",
+                period=dl_period,
                 auto_adjust=True,
                 progress=False,
             )

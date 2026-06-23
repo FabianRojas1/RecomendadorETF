@@ -25,6 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 # ── Importar módulos del proyecto ──────────────────────────────────────────────
+from config             import Config
 from src.data_loader    import DataLoader
 from src.indicators     import IndicatorCalculator
 from src.scoring        import ScoringEngine
@@ -43,7 +44,8 @@ async def run_weekly_analysis():
     """Descarga datos, calcula indicadores y envía reporte + PDF a Telegram."""
     logger.info("=== Iniciando análisis semanal ===")
 
-    loader       = DataLoader()
+    config       = Config()
+    loader       = DataLoader(config)
     scorer       = ScoringEngine()
     news_a       = NewsAnalyzer(api_key=NEWS_KEY)
     cop_rate     = loader.get_cop_usd_rate()
@@ -55,8 +57,7 @@ async def run_weekly_analysis():
     for _, row in portfolio.iterrows():
         ticker = row["ticker"]
         try:
-            yf_ticker = loader.get_yf_ticker(ticker)
-            df = loader.download_history(yf_ticker, period="2y")
+            df = loader.download_history(ticker, period="2y")
 
             if df is None or df.empty or len(df) < 60:
                 logger.warning("%s: datos insuficientes, omitido", ticker)
@@ -113,7 +114,8 @@ async def run_daily_monitor():
     """
     logger.info("=== Monitor diario de precios ===")
 
-    loader    = DataLoader()
+    config    = Config()
+    loader    = DataLoader(config)
     cop_rate  = loader.get_cop_usd_rate()
     portfolio = loader.load_portfolio()
     alerts    = 0
@@ -121,8 +123,7 @@ async def run_daily_monitor():
     for _, row in portfolio.iterrows():
         ticker = row["ticker"]
         try:
-            yf_ticker = loader.get_yf_ticker(ticker)
-            df = loader.download_history(yf_ticker, period="5d")
+            df = loader.download_history(ticker, period="5d")
 
             if df is None or len(df) < 2:
                 continue
