@@ -96,6 +96,8 @@ class DataLoader:
         try:
             df = yf.download('COP=X', period='5d', auto_adjust=True, progress=False)
             if not df.empty:
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
                 val = float(df['Close'].dropna().iloc[-1])
                 logger.info("COP/USD rate: %.2f", val)
                 return val
@@ -211,6 +213,8 @@ class DataLoader:
     def save_recommendation(self, ticker: str, rec: dict):
         """Persist a recommendation record to SQLite."""
         import json
+        conf = rec.get('confidence', {})
+        conf_score = conf.get('score') if isinstance(conf, dict) else conf
         conn = sqlite3.connect(self.config.DB_PATH)
         conn.execute('''
             INSERT INTO recommendations
@@ -222,14 +226,14 @@ class DataLoader:
             ticker,
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             rec.get('action'),
-            rec.get('confidence'),
+            conf_score,
             rec.get('score'),
             json.dumps(rec.get('explanation', {}), ensure_ascii=False),
             json.dumps(rec.get('news', []), ensure_ascii=False),
-            rec.get('price'),
+            rec.get('price_usd'),
             rec.get('price_cop'),
-            rec.get('target'),
-            rec.get('stop_loss'),
+            rec.get('target_usd'),
+            rec.get('stop_loss_usd'),
         ))
         conn.commit()
         conn.close()
