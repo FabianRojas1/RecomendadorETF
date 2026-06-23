@@ -1,189 +1,223 @@
 """
-main.py - Punto de entrada del Recomendador de Inversiones
-Uso:
-  python main.py           → inicia scheduler (corre indefinidamente)
-  python main.py --now     → ejecuta análisis completo ahora y envía reporte
-  python main.py --test    → verifica configuración y envía mensaje de prueba
+main.py — Punto de entrada del recomendador de inversiones.
+
+Modos:
+  python main.py           → scheduler daemon (uso local)
+  python main.py --now     → análisis semanal inmediato (GitHub Actions)
+  python main.py --monitor → monitor de precios diario (GitHub Actions)
+  python main.py --test    → prueba de conectividad Telegram
 """
+import argparse
 import asyncio
 import logging
+import os
 import sys
-import time
 
-# ── Config & modules ──────────────────────────────────────────────────────────
-from config import Config
+from dotenv import load_dotenv
+
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("main")
+
+# ── Importar módulos del proyecto ──────────────────────────────────────────────
 from src.data_loader    import DataLoader
 from src.indicators     import IndicatorCalculator
 from src.scoring        import ScoringEngine
 from src.news_analyzer  import NewsAnalyzer
-from src.telegram_bot   import TelegramBot
-from src.scheduler      import InvestmentScheduler
-
-# ── Logging ───────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level   = logging.INFO,
-    format  = '%(asctime)s [%(levelname)s] %(name)s — %(message)s',
-    datefmt = '%Y-%m-%d %H:%M:%S',
-)
-logger = logging.getLogger(__name__)
+from src.telegram_bot   import send_weekly_report, send_test_message, send_price_alert
 
 
-def build_components(config: Config):
-    """Instantiate all system components."""
-    loader  = DataLoader(config)
-    scorer  = ScoringEngine(config)
-    news    = NewsAnalyzer(config)
-    tg      = TelegramBot(config)
-    return loader, scorer, news, tg
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID",   "")
+NEWS_KEY  = os.getenv("NEWS_API_KEY",        "")
 
 
-def validate_config(config: Config):
-    """Fail fast if required environment variables are missing."""
-    missing = []
-    if not config.TELEGRAM_BOT_TOKEN:
-        missing.append('TELEGRAM_BOT_TOKEN')
-    if not config.TELEGRAM_CHAT_ID:
-        missing.append('TELEGRAM_CHAT_ID')
-    if not config.NEWS_API_KEY:
-        missing.append('NEWS_API_KEY (optional but recommended)')
-    if missing:
-        for m in missing:
-            logger.warning("Missing env var: %s", m)
-    return len([m for m in missing if 'optional' not in m]) == 0
+# ── ANÁLISIS SEMANAL ──────────────────────────────────────────────────────────
 
+async def run_weekly_analysis():
+    """Descarga datos, calcula indicadores y envía reporte + PDF a Telegram."""
+    logger.info("=== Iniciando análisis semanal ===")
 
-# ── Modes ─────────────────────────────────────────────────────────────────────
+    loader       = DataLoader()
+    scorer       = ScoringEngine()
+    news_a       = NewsAnalyzer(api_key=NEWS_KEY)
+    cop_rate     = loader.get_cop_usd_rate()
+    portfolio    = loader.load_portfolio()
 
-async def run_test(config, loader, tg):
-    """Send a test message to Telegram to verify the bot works."""
-    logger.info("Sending test message to Telegram…")
-    try:
-        await tg.send_startup_message()
-    except Exception as e:
-        logger.error("Telegram test failed: %s", e)
-        logger.error(
-            "Verifica TELEGRAM_CHAT_ID, abre el bot en Telegram o agrégalo al chat/grupo.",
-        )
-        return False
+    logger.info("Tasa COP/USD: %.0f | Activos: %d", cop_rate, len(portfolio))
 
-    logger.info("Test message sent. Check your Telegram!")
-
-    # Quick indicator test on SPY
-    logger.info("Downloading SPY for a quick indicator test…")
-    df = loader.download_history('SPY')
-    if not df.empty:
-        from src.indicators import IndicatorCalculator
-        calc = IndicatorCalculator(df)
-        ind  = calc.calculate()
-        vals = calc.get_current(ind)
-        logger.info(
-            "SPY quick check — Close: $%.2f | RSI: %.1f | ADX: %.1f | SMA50: $%.2f",
-            vals.get('close', 0),
-            vals.get('rsi', 0) or 0,
-            vals.get('adx', 0) or 0,
-            vals.get('sma_50', 0) or 0,
-        )
-    else:
-        logger.warning("Could not download SPY data")
-
-
-async def run_now(config, loader, scorer, news, tg):
-    """Run a full weekly analysis immediately."""
-    portfolio = loader.load_portfolio()
-    cop_rate  = loader.get_cop_usd_rate()
-
-    logger.info("Starting immediate full analysis for %d tickers…", len(portfolio))
-    results = {}
-
+    recommendations = []
     for _, row in portfolio.iterrows():
-        ticker = row['ticker']
-        logger.info("  → %s", ticker)
+        ticker = row["ticker"]
         try:
-            df = loader.download_history(ticker)
-            if df.empty:
-                logger.warning("    No data for %s", ticker)
+            yf_ticker = loader.get_yf_ticker(ticker)
+            df = loader.download_history(yf_ticker, period="2y")
+
+            if df is None or df.empty or len(df) < 60:
+                logger.warning("%s: datos insuficientes, omitido", ticker)
                 continue
-            loader._store_prices(ticker, df)
 
-            calc  = IndicatorCalculator(df)
-            ind   = calc.calculate()
-            vals  = calc.get_current(ind)
-            nws   = news.get_news_for_ticker(ticker)
-            score = scorer.calculate_score(vals, nws)
-            rec   = scorer.generate_recommendation(ticker, score, vals, nws, cop_rate)
+            calc   = IndicatorCalculator(df)
+            ind    = calc.calculate()
+            values = calc.get_current(ind)
 
-            results[ticker] = rec
-            loader.save_recommendation(ticker, rec)
+            news   = news_a.get_news_for_ticker(ticker, days=7)
+            score_data = scorer.calculate_score(values, news)
 
-            action = rec['action']
-            conf   = rec['confidence']
-            total  = rec['score']
-            logger.info(
-                "    %s → %s (score: %+.1f, conf: %d/9)",
-                ticker, action, total, conf,
+            rec = scorer.generate_recommendation(
+                ticker=ticker,
+                score_data=score_data,
+                values=values,
+                news_data=news,
+                cop_rate=cop_rate,
             )
+            # Enriquecer con datos del portafolio
+            rec["current_value_cop"] = float(row.get("current_value", 0))
+            rec["pct_portfolio"]     = row.get("pct_of_total_portfolio", "")
+            rec["asset_subtype"]     = row.get("asset_subtype", "")
+
+            recommendations.append(rec)
+            loader.save_recommendation(ticker, rec)
+            logger.info("%s → %s  (score %.1f)", ticker, rec["action"], rec["score"])
 
         except Exception as e:
-            logger.error("    Error analyzing %s: %s", ticker, e)
-            results[ticker] = None
+            logger.error("Error procesando %s: %s", ticker, e)
 
-    valid = {k: v for k, v in results.items() if v}
-    logger.info("Analysis complete. Sending Telegram report for %d tickers…", len(valid))
+    if not recommendations:
+        logger.error("Sin recomendaciones generadas. Abortando.")
+        return
 
-    if valid:
-        await tg.send_weekly_report(valid, portfolio, cop_rate)
-        logger.info("Report sent!")
-    else:
-        logger.error("No valid results.")
+    portfolio_total = portfolio["current_value"].astype(float).sum()
 
-
-def run_scheduler(config, loader, scorer, news, tg):
-    """Start the background scheduler and keep the process alive."""
-    scheduler = InvestmentScheduler(
-        config           = config,
-        data_loader      = loader,
-        indicator_calc_cls = IndicatorCalculator,
-        scoring_engine   = scorer,
-        news_analyzer    = news,
-        telegram_bot     = tg,
+    ok = await send_weekly_report(
+        recommendations=recommendations,
+        portfolio_total_cop=portfolio_total,
+        cop_usd_rate=cop_rate,
+        bot_token=BOT_TOKEN,
+        chat_id=CHAT_ID,
     )
-    scheduler.start()
-    asyncio.run(tg.send_startup_message())
+    logger.info("Reporte enviado: %s", "OK" if ok else "FALLO")
 
-    logger.info("=" * 60)
-    logger.info("  Recomendador de Inversiones en ejecución")
-    logger.info("  Análisis semanal: Domingos 19:00 (Bogotá)")
-    logger.info("  Monitor de precios: cada 24h")
-    logger.info("  Presiona Ctrl+C para detener")
-    logger.info("=" * 60)
+
+# ── MONITOR DIARIO ────────────────────────────────────────────────────────────
+
+async def run_daily_monitor():
+    """
+    Detecta movimientos de precio > 5% comparando los últimos 2 cierres diarios.
+    Sin necesidad de BD persistente — funciona perfectamente en GitHub Actions.
+    """
+    logger.info("=== Monitor diario de precios ===")
+
+    loader    = DataLoader()
+    cop_rate  = loader.get_cop_usd_rate()
+    portfolio = loader.load_portfolio()
+    alerts    = 0
+
+    for _, row in portfolio.iterrows():
+        ticker = row["ticker"]
+        try:
+            yf_ticker = loader.get_yf_ticker(ticker)
+            df = loader.download_history(yf_ticker, period="5d")
+
+            if df is None or len(df) < 2:
+                continue
+
+            prev  = float(df["Close"].iloc[-2])
+            curr  = float(df["Close"].iloc[-1])
+            pct   = (curr - prev) / prev * 100
+
+            if abs(pct) >= 5.0:
+                logger.info("ALERTA: %s movió %.1f%%", ticker, pct)
+                await send_price_alert(
+                    ticker=ticker,
+                    prev_close=prev,
+                    current_price=curr,
+                    pct_change=pct,
+                    cop_usd_rate=cop_rate,
+                    bot_token=BOT_TOKEN,
+                    chat_id=CHAT_ID,
+                )
+                alerts += 1
+
+        except Exception as e:
+            logger.error("Error monitor %s: %s", ticker, e)
+
+    logger.info("Monitor completo — %d alertas enviadas", alerts)
+
+
+# ── TEST ──────────────────────────────────────────────────────────────────────
+
+async def run_test():
+    logger.info("Enviando mensaje de prueba...")
+    ok = await send_test_message(BOT_TOKEN, CHAT_ID)
+    logger.info("Prueba: %s", "OK" if ok else "FALLO")
+
+
+# ── SCHEDULER LOCAL (daemon) ──────────────────────────────────────────────────
+
+def run_scheduler():
+    """Modo daemon con APScheduler para ejecución local."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        import pytz
+        import time
+    except ImportError:
+        logger.error("APScheduler no instalado. Para modo local: pip install APScheduler")
+        sys.exit(1)
+
+    tz = pytz.timezone(os.getenv("TIMEZONE", "America/Bogota"))
+    sched = BackgroundScheduler(timezone=tz)
+
+    sched.add_job(
+        lambda: asyncio.run(run_weekly_analysis()),
+        "cron", day_of_week="sun", hour=19, minute=0,
+        id="weekly_analysis", name="Análisis semanal dominical",
+    )
+    sched.add_job(
+        lambda: asyncio.run(run_daily_monitor()),
+        "interval", hours=24,
+        id="daily_monitor", name="Monitor diario de precios",
+    )
+
+    sched.start()
+    logger.info("Scheduler iniciado. Análisis: domingos 19:00 Bogotá | Monitor: cada 24h")
+    logger.info("Presiona Ctrl+C para detener.")
 
     try:
         while True:
-            time.sleep(60)
-    except KeyboardInterrupt:
-        logger.info("Stopping…")
-        scheduler.shutdown()
-        logger.info("Goodbye.")
+            import time; time.sleep(60)
+    except (KeyboardInterrupt, SystemExit):
+        sched.shutdown()
+        logger.info("Scheduler detenido.")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── MAIN ──────────────────────────────────────────────────────────────────────
 
-if __name__ == '__main__':
-    config = Config()
+def main():
+    parser = argparse.ArgumentParser(description="Recomendador de Inversiones ETF")
+    parser.add_argument("--now",     action="store_true", help="Análisis semanal inmediato")
+    parser.add_argument("--monitor", action="store_true", help="Monitor diario de precios")
+    parser.add_argument("--test",    action="store_true", help="Test de conectividad Telegram")
+    args = parser.parse_args()
 
-    if not validate_config(config):
-        logger.error("Missing required environment variables. Check .env file.")
+    if not BOT_TOKEN or not CHAT_ID:
+        logger.error("TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID son requeridos en .env o variables de entorno")
         sys.exit(1)
 
-    loader, scorer, news, tg = build_components(config)
-
-    if '--test' in sys.argv:
-        success = asyncio.run(run_test(config, loader, tg))
-        if not success:
-            sys.exit(1)
-
-    elif '--now' in sys.argv:
-        asyncio.run(run_now(config, loader, scorer, news, tg))
-
+    if args.now:
+        asyncio.run(run_weekly_analysis())
+    elif args.monitor:
+        asyncio.run(run_daily_monitor())
+    elif args.test:
+        asyncio.run(run_test())
     else:
-        run_scheduler(config, loader, scorer, news, tg)
+        run_scheduler()
+
+
+if __name__ == "__main__":
+    main()
