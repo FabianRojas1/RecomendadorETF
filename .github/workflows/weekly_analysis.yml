@@ -1,0 +1,33 @@
+name: Analisis Semanal de Inversiones
+
+on:
+  schedule:
+    # Domingo 19:00 hora Bogotá = Lunes 00:00 UTC (UTC-5)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:   # Permite ejecución manual desde GitHub
+
+jobs:
+  analisis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar análisis semanal
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          NEWS_API_KEY:       ${{ secrets.NEWS_API_KEY }}
+          TIMEZONE:           America/Bogota
+        run: python main.py --now
