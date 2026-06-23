@@ -13,6 +13,9 @@ try:
     FPDF_OK = True
 except ImportError:
     FPDF_OK = False
+    FPDF = object  # fallback so class definition below doesn't raise NameError
+    XPos = None
+    YPos = None
     logger.warning("fpdf2 not installed. Run: pip install fpdf2")
 
 
