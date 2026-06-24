@@ -322,7 +322,7 @@ def _make_ticker_page(rec: dict):
         tbl = ax_t.table(
             cellText=rows,
             colLabels=["Indicador", "Pts", "Señal", "Detalle"],
-            cellColours=row_colors + [["#eeeeee"]*4],
+            cellColours=row_colors,
             loc="center", bbox=[0, 0, 1, 0.90],
         )
         tbl.auto_set_font_size(False); tbl.set_fontsize(8)
