@@ -25,27 +25,16 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 # ── Importar módulos del proyecto ──────────────────────────────────────────────
-from config             import Config
 from src.data_loader    import DataLoader
 from src.indicators     import IndicatorCalculator
-from src.scoring        import Scorer
+from src.scoring        import ScoringEngine
 from src.news_analyzer  import NewsAnalyzer
 from src.telegram_bot   import send_weekly_report, send_test_message, send_price_alert
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID",   "")
-
-
-# ── Helpers de precio ────────────────────────────────────────────────────────
-
-def _calc_target(price: float, action: str):
-    pct = {"COMPRA FUERTE": 0.10, "COMPRA": 0.08, "VENTA FUERTE": -0.10, "VENTA": -0.08}.get(action)
-    return price * (1 + pct) if pct and price else None
-
-def _calc_stop_loss(price: float, action: str):
-    pct = {"COMPRA FUERTE": -0.05, "COMPRA": -0.06, "VENTA FUERTE": 0.05, "VENTA": 0.06}.get(action)
-    return price * (1 + pct) if pct and price else None
+NEWS_KEY  = os.getenv("NEWS_API_KEY",        "")
 
 
 # ── ANÁLISIS SEMANAL ──────────────────────────────────────────────────────────
@@ -54,10 +43,9 @@ async def run_weekly_analysis():
     """Descarga datos, calcula indicadores y envía reporte + PDF a Telegram."""
     logger.info("=== Iniciando análisis semanal ===")
 
-    config       = Config()
-    loader       = DataLoader(config)
-    scorer       = Scorer()
-    news_a       = NewsAnalyzer(config)
+    loader       = DataLoader()
+    scorer       = ScoringEngine()
+    news_a       = NewsAnalyzer(api_key=NEWS_KEY)
     cop_rate     = loader.get_cop_usd_rate()
     portfolio    = loader.load_portfolio()
 
@@ -67,7 +55,8 @@ async def run_weekly_analysis():
     for _, row in portfolio.iterrows():
         ticker = row["ticker"]
         try:
-            df = loader.download_history(ticker, period="2y")
+            yf_ticker = loader.get_yf_ticker(ticker)
+            df = loader.download_history(yf_ticker, period="2y")
 
             if df is None or df.empty or len(df) < 60:
                 logger.warning("%s: datos insuficientes, omitido", ticker)
@@ -77,51 +66,23 @@ async def run_weekly_analysis():
             ind    = calc.calculate()
             values = calc.get_current(ind)
 
-            news        = news_a.get_news_for_ticker(ticker, days=7)
-            result      = scorer.score(values, news)
-            score       = result["score"]
-            action      = result["action"]
-            breakdown   = result["breakdown"]
+            news   = news_a.get_news_for_ticker(ticker, days=7)
+            score_data = scorer.calculate_score(values, news)
 
-            price_usd   = values.get("close") or 0
-            price_cop   = round(price_usd * cop_rate, 0) if price_usd else 0
-            target_usd  = _calc_target(price_usd, action)
-            sl_usd      = _calc_stop_loss(price_usd, action)
-
-            n_active    = sum(1 for c in breakdown.values() if abs(c.get("weighted", 0)) >= 0.5)
-            confidence  = {"score": n_active, "total": len(breakdown)}
-
-            reasons = []
-            for comp in breakdown.values():
-                w      = comp.get("weighted", 0)
-                detail = comp.get("details", "") or comp.get("signal", "")
-                if abs(w) >= 1.0 and detail:
-                    reasons.append(f"{'[+]' if w > 0 else '[-]'} {detail}")
-
-            # score_components con alias weighted_score para compatibilidad con pdf
-            score_components = {
-                k: {**v, "weighted_score": v.get("weighted", 0)}
-                for k, v in breakdown.items()
-            }
-
-            rec = {
-                "ticker":          ticker,
-                "action":          action,
-                "score":           score,
-                "score_components":score_components,
-                "confidence":      confidence,
-                "price_usd":       round(price_usd, 2),
-                "price_cop":       price_cop,
-                "target_usd":      round(target_usd, 2) if target_usd else None,
-                "stop_loss_usd":   round(sl_usd, 2)     if sl_usd     else None,
-                "reasons":         reasons[:5],
-                "news":            news[:5],
-                "squeeze_state":   values.get("squeeze_state", ""),
-                "adx_value":       values.get("adx") or 0,
-                "current_value_cop": float(row.get("current_value", 0)),
-                "pct_portfolio":   row.get("pct_of_total_portfolio", ""),
-                "asset_subtype":   row.get("asset_subtype", ""),
-            }
+            rec = scorer.generate_recommendation(
+                ticker=ticker,
+                score_data=score_data,
+                values=values,
+                news_data=news,
+                cop_rate=cop_rate,
+            )
+            # Enriquecer con datos del portafolio
+            # Guardar noticias en el rec para el mensaje de Telegram
+            if "news" not in rec:
+                rec["news"] = news
+            rec["current_value_cop"] = float(row.get("current_value", 0))
+            rec["pct_portfolio"]     = row.get("pct_of_total_portfolio", "")
+            rec["asset_subtype"]     = row.get("asset_subtype", "")
 
             recommendations.append(rec)
             loader.save_recommendation(ticker, rec)
@@ -155,8 +116,7 @@ async def run_daily_monitor():
     """
     logger.info("=== Monitor diario de precios ===")
 
-    config    = Config()
-    loader    = DataLoader(config)
+    loader    = DataLoader()
     cop_rate  = loader.get_cop_usd_rate()
     portfolio = loader.load_portfolio()
     alerts    = 0
@@ -164,7 +124,8 @@ async def run_daily_monitor():
     for _, row in portfolio.iterrows():
         ticker = row["ticker"]
         try:
-            df = loader.download_history(ticker, period="5d")
+            yf_ticker = loader.get_yf_ticker(ticker)
+            df = loader.download_history(yf_ticker, period="5d")
 
             if df is None or len(df) < 2:
                 continue

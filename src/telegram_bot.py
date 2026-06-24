@@ -129,18 +129,37 @@ async def _send_message(bot: "Bot", chat_id: str, text: str):
 
 
 
+def _classify_sentiment(title: str, description: str) -> str:
+    """Clasifica sentimiento por keywords — mismo criterio que _eval_news."""
+    KEYWORDS_POS = {
+        "rally", "surge", "gain", "bullish", "record", "growth",
+        "recovery", "breakout", "beat", "strong", "rise", "soar",
+        "outperform", "upgrade", "buy", "accumulate",
+    }
+    KEYWORDS_NEG = {
+        "crash", "plunge", "fall", "bearish", "recession", "war",
+        "tariff", "ban", "crisis", "collapse", "decline", "risk",
+        "sell", "downgrade", "weak", "loss", "drop", "slump",
+    }
+    text = ((title or "") + " " + (description or "")).lower()
+    p = sum(1 for w in KEYWORDS_POS if w in text)
+    n = sum(1 for w in KEYWORDS_NEG if w in text)
+    if p > n:   return "positive"
+    elif n > p: return "negative"
+    return "neutral"
+
+
 def _fmt_news_summary(recommendations: list) -> str:
     """
-    Construye el mensaje de noticias relevantes para Telegram.
+    Mensaje de noticias para Telegram.
 
-    Criterios de inclusion:
-      - Solo noticias positivas para tickers con COMPRA (confirman la senal)
-      - Solo noticias negativas para tickers con VENTA  (confirman la senal)
-      - Neutrales: descartadas
-      - Se incluye un ticker si tiene >= 2 noticias confirmando,
-        O si tiene >= 1 y el score absoluto es fuerte (>= 20)
+    Criterios:
+      - Solo noticias positivas para COMPRA, negativas para VENTA
+      - Sentimiento clasificado por keywords (NewsAPI no lo provee)
+      - Se incluye si: 2+ noticias confirman, O score >= 20 con 1+ noticia
+      - Neutrales descartadas
     """
-    lines = ["\U0001f4f0 <b>NOTICIAS QUE CONFIRMAN SENAL</b>", ""]
+    lines = ["📰 <b>NOTICIAS QUE CONFIRMAN SEÑAL</b>", ""]
 
     relevant = []
 
@@ -148,18 +167,28 @@ def _fmt_news_summary(recommendations: list) -> str:
         action = rec.get("action", "")
         score  = rec.get("score", 0)
         ticker = rec.get("ticker", "")
-        news   = rec.get("news", [])
 
-        if not news or "MANTENER" in action:
+        if "MANTENER" in action:
+            continue
+
+        # news puede estar en "news" o "news_data" segun como lo guarde el rec
+        news = rec.get("news") or rec.get("news_data") or []
+        if not news:
             continue
 
         is_compra = "COMPRA" in action
         is_venta  = "VENTA"  in action
 
-        # Filtrar solo noticias que confirman la senal
         confirming = []
         for item in news:
-            sent = item.get("sentiment", "neutral")
+            # Usar campo sentiment si existe; si no, clasificar por keywords
+            sent = item.get("sentiment")
+            if not sent:
+                sent = _classify_sentiment(
+                    item.get("title", ""),
+                    item.get("description", ""),
+                )
+
             if is_compra and sent == "positive":
                 confirming.append(item)
             elif is_venta and sent == "negative":
@@ -168,9 +197,8 @@ def _fmt_news_summary(recommendations: list) -> str:
         if not confirming:
             continue
 
-        # Incluir si: 2+ noticias confirmando, O score muy fuerte (>=20) con al menos 1
-        strong_score = abs(score) >= 20
-        if len(confirming) >= 2 or (strong_score and len(confirming) >= 1):
+        strong = abs(score) >= 20
+        if len(confirming) >= 2 or (strong and len(confirming) >= 1):
             relevant.append({
                 "ticker":     ticker,
                 "action":     action,
@@ -179,35 +207,32 @@ def _fmt_news_summary(recommendations: list) -> str:
             })
 
     if not relevant:
-        return ""  # No enviar si no hay nada relevante
+        return ""
 
-    # Ordenar por score absoluto descendente
     relevant.sort(key=lambda x: -abs(x["score"]))
 
     for item in relevant:
         ticker = item["ticker"]
         action = item["action"]
         score  = item["score"]
-        icon   = "\U0001f7e2" if "COMPRA" in action else "\U0001f534"
         n_conf = len(item["confirming"])
+        icon   = "🟢" if "COMPRA" in action else "🔴"
+        plural = "s" if n_conf > 1 else ""
 
-        lines.append(f"{icon} <b>{ticker}</b>  {score:+.1f}/40  "
-                     f"({n_conf} noticia{'s' if n_conf > 1 else ''} confirman)")
+        lines.append(f"{icon} <b>{ticker}</b>  {score:+.1f}/40  ({n_conf} noticia{plural} confirman)")
 
-        # Mostrar las 3 mas relevantes
         for news_item in item["confirming"][:3]:
             title  = (news_item.get("title") or "").strip()
             source = news_item.get("source", {})
             src    = source.get("name", "") if isinstance(source, dict) else str(source)
-            # Truncar titulo a 100 chars
             if len(title) > 100:
                 title = title[:97] + "..."
             src_txt = f"  <i>{src}</i>" if src else ""
-            lines.append(f"    \u2022 {title}{src_txt}")
+            lines.append(f"    • {title}{src_txt}")
 
         lines.append("")
 
-    lines.append("<i>Solo se muestran noticias que confirman senal de compra/venta.</i>")
+    lines.append("<i>Solo noticias que confirman señal de compra/venta.</i>")
     return "\n".join(lines)
 
 
