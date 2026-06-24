@@ -162,6 +162,8 @@ def _fmt_news_summary(recommendations: list) -> str:
     lines = ["📰 <b>NOTICIAS QUE CONFIRMAN SEÑAL</b>", ""]
 
     relevant = []
+    total_with_news = 0
+    total_with_confirming = 0
 
     for rec in recommendations:
         action = rec.get("action", "")
@@ -176,6 +178,7 @@ def _fmt_news_summary(recommendations: list) -> str:
         if not news:
             continue
 
+        total_with_news += 1
         is_compra = "COMPRA" in action
         is_venta  = "VENTA"  in action
 
@@ -194,10 +197,15 @@ def _fmt_news_summary(recommendations: list) -> str:
             elif is_venta and sent == "negative":
                 confirming.append(item)
 
+        logger.info("Noticias %s: %d totales, %d confirman señal %s (score %.1f)",
+                    ticker, len(news), len(confirming), action, score)
+
         if not confirming:
             continue
 
-        strong = abs(score) >= 20
+        total_with_confirming += 1
+        # Criterio: 2+ noticias confirman, O score >= 15 con 1+ noticia
+        strong = abs(score) >= 15
         if len(confirming) >= 2 or (strong and len(confirming) >= 1):
             relevant.append({
                 "ticker":     ticker,
@@ -205,6 +213,10 @@ def _fmt_news_summary(recommendations: list) -> str:
                 "score":      score,
                 "confirming": confirming,
             })
+
+    logger.info("Noticias resumen: %d tickers con señal tienen noticias, "
+                "%d con noticias que confirman, %d pasan el filtro final",
+                total_with_news, total_with_confirming, len(relevant))
 
     if not relevant:
         return ""

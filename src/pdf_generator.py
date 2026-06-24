@@ -75,6 +75,10 @@ def generate_report_pdf(
                         bbox_inches="tight")
             plt.close("all")
 
+            # Gráfica del portafolio
+            pdf.savefig(_make_portfolio_chart(recommendations), bbox_inches="tight")
+            plt.close("all")
+
             # Sección COMPRAS
             if compras:
                 pdf.savefig(_make_section_header("COMPRAS", compras, COLORS["COMPRA FUERTE"]),
@@ -112,6 +116,141 @@ def generate_report_pdf(
 
 
 # ── Páginas ───────────────────────────────────────────────────────────────────
+
+def _make_portfolio_chart(recs: list):
+    """
+    Página 2: Vista del portafolio por tipo de acción.
+      - Izquierda: donut chart (número de activos)
+      - Derecha:   barras horizontales (% del portafolio en COP)
+      - Abajo:     tabla de top activos por score absoluto
+    """
+    ORDER  = ["COMPRA FUERTE", "COMPRA", "MANTENER", "VENTA", "VENTA FUERTE"]
+    CLABEL = {"COMPRA FUERTE": "Compra\nFuerte", "COMPRA": "Compra",
+              "MANTENER": "Mantener", "VENTA": "Venta", "VENTA FUERTE": "Venta\nFuerte"}
+
+    # Agrupar
+    groups: dict[str, list] = {k: [] for k in ORDER}
+    for r in recs:
+        a = r.get("action", "MANTENER")
+        key = a if a in groups else "MANTENER"
+        groups[key].append(r)
+
+    labels  = [k for k in ORDER if groups[k]]
+    counts  = [len(groups[k]) for k in labels]
+    colors  = [COLORS[k] for k in labels]
+    total_cop_val = sum(r.get("current_value_cop", 0) or 0 for r in recs) or 1
+    pcts    = [
+        sum((r.get("current_value_cop", 0) or 0) for r in groups[k]) / total_cop_val * 100
+        for k in labels
+    ]
+
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.93, 1, 0.07])
+    ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=COLORS["bg_header"], ec="none"))
+    ax_h.text(0.5, 0.55, "Distribución del Portafolio por Señal",
+              ha="center", va="center", fontsize=14, fontweight="bold", color="white")
+    ax_h.text(0.5, 0.18, f"{len(recs)} activos analizados — {datetime.now().strftime('%d/%m/%Y')}",
+              ha="center", va="center", fontsize=9, color="#aaaadd")
+
+    # ── Donut chart (izquierda) ────────────────────────────────────────────────
+    ax_d = fig.add_axes([0.02, 0.58, 0.44, 0.33])
+    wedges, texts, autotexts = ax_d.pie(
+        counts, labels=None, colors=colors,
+        autopct=lambda p: f"{p:.0f}%" if p > 5 else "",
+        startangle=90, pctdistance=0.75,
+        wedgeprops={"width": 0.55, "edgecolor": "white", "linewidth": 1.5},
+    )
+    for at in autotexts:
+        at.set_fontsize(9); at.set_fontweight("bold"); at.set_color("white")
+    ax_d.set_title("N.° de activos", fontsize=10, fontweight="bold",
+                   color=COLORS["text_dark"], pad=8)
+
+    # Leyenda
+    ax_d.legend(
+        wedges,
+        [f"{CLABEL[k]}  ({len(groups[k])})" for k in labels],
+        loc="lower center", bbox_to_anchor=(0.5, -0.18),
+        fontsize=8, ncol=2, frameon=False,
+    )
+
+    # ── Barras horizontales (derecha) ──────────────────────────────────────────
+    ax_b = fig.add_axes([0.52, 0.60, 0.44, 0.28])
+    ax_b.set_xlim(0, max(pcts) * 1.15 if pcts else 100)
+    ax_b.set_ylim(-0.5, len(labels) - 0.5)
+    ax_b.set_yticks(range(len(labels)))
+    ax_b.set_yticklabels([CLABEL[k] for k in labels], fontsize=9)
+    ax_b.set_xlabel("% del portafolio (COP)", fontsize=8)
+    ax_b.set_title("Exposición en COP", fontsize=10, fontweight="bold",
+                   color=COLORS["text_dark"])
+    ax_b.spines[["top", "right"]].set_visible(False)
+    ax_b.tick_params(axis="x", labelsize=8)
+
+    for i, (pct, color) in enumerate(zip(pcts, colors)):
+        ax_b.barh(i, pct, color=color, alpha=0.85, height=0.6)
+        ax_b.text(pct + 0.5, i, f"{pct:.1f}%", va="center", fontsize=8,
+                  color=COLORS["text_dark"], fontweight="bold")
+
+    # ── Tabla: top activos por score absoluto ──────────────────────────────────
+    ax_t = fig.add_axes([0.02, 0.08, 0.96, 0.46])
+    ax_t.axis("off")
+    ax_t.text(0, 0.99, "Ranking de activos por señal (score absoluto):",
+              fontsize=10, fontweight="bold", color=COLORS["text_dark"],
+              va="top", transform=ax_t.transAxes)
+
+    sorted_recs = sorted(recs, key=lambda x: -abs(x.get("score", 0)))[:20]
+
+    tbl_data   = []
+    tbl_colors = []
+    for r in sorted_recs:
+        act   = r.get("action", "")
+        score = r.get("score", 0)
+        price = r.get("price_usd", 0) or 0
+        val   = r.get("current_value_cop", 0) or 0
+        pct_p = r.get("pct_portfolio", "") or ""
+        tbl_data.append([
+            r.get("ticker", ""),
+            act,
+            f"{score:+.1f}",
+            f"${price:.2f}",
+            f"COP {val:,.0f}" if val else "—",
+            str(pct_p),
+        ])
+        rc = COLORS.get(act, COLORS["MANTENER"])
+        tbl_colors.append([rc, rc, rc, "#f5f5f5", "#f5f5f5", "#f5f5f5"])
+
+    if tbl_data:
+        tbl = ax_t.table(
+            cellText=tbl_data,
+            colLabels=["Ticker", "Acción", "Score", "Precio USD", "Valor COP", "% Port."],
+            loc="upper center", bbox=[0, 0, 1, 0.95],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(8)
+        tbl.auto_set_column_width([0, 1, 2, 3, 4, 5])
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#2d3a5a")
+                cell.set_text_props(fontweight="bold", color="white")
+            elif r <= len(tbl_colors):
+                cell.set_facecolor(tbl_colors[r - 1][c])
+                if c <= 2:
+                    cell.set_text_props(color="white", fontweight="bold")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    ax_f = fig.add_axes([0, 0, 1, 0.04])
+    ax_f.axis("off")
+    ax_f.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc="#f0f0f0", ec="none"))
+    ax_f.text(0.5, 0.5,
+              "No constituye asesoría financiera. Solo para referencia personal.",
+              ha="center", va="center", fontsize=7, color="#999999")
+    return fig
+
 
 def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant):
     fig, ax = plt.subplots(figsize=(8.5, 11))
@@ -389,181 +528,3 @@ def _make_mantener_page(mantener: list):
 
 
 
-def _make_news_pages(all_news: list, recommendations: list = None) -> list:
-    """
-    Paginas de noticias SEPARADAS del analisis tecnico.
-
-    Estructura:
-      Pag 1: resumen de sentimiento por ticker (tabla con balance +/-)
-      Pag N: titulares de cada ticker, coloreados, con descripcion y fuente
-
-    Nota: son CONTEXTO GEOPOLITICO/MACRO — no modifican el analisis tecnico.
-    El score de noticias es independiente de los indicadores tecnicos.
-    """
-    if recommendations is None:
-        recommendations = []
-
-    figs = []
-
-    SENT_COLOR  = {"positive": COLORS["green"], "negative": COLORS["red"],  "neutral": COLORS["neutral"]}
-    SENT_MARKER = {"positive": "▲",         "negative": "▼",        "neutral": "●"}
-
-    # ── Agrupar por ticker ────────────────────────────────────────────────────
-    by_ticker = {}
-    for item in all_news:
-        t = item.get("ticker", "MKTG")
-        if t not in by_ticker:
-            by_ticker[t] = {"pos": 0, "neg": 0, "neu": 0, "items": []}
-        s = item.get("sentiment", "neutral")
-        if   s == "positive": by_ticker[t]["pos"] += 1
-        elif s == "negative": by_ticker[t]["neg"] += 1
-        else:                 by_ticker[t]["neu"] += 1
-        by_ticker[t]["items"].append(item)
-
-    # ── Pagina resumen ────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(8.5, 11))
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
-    fig.patch.set_facecolor("white")
-
-    ax.add_patch(mpatches.FancyBboxPatch((0, 0.90), 1, 0.10,
-                 boxstyle="square,pad=0", fc="#2d4a6e", ec="none"))
-    ax.text(0.5, 0.965, "NOTICIAS Y CONTEXTO GEOPOLITICO / MACRO",
-            ha="center", va="center", fontsize=13, fontweight="bold",
-            color="white", transform=ax.transAxes)
-    ax.text(0.5, 0.918,
-            "Esta seccion es informacion adicional — no forma parte del analisis tecnico",
-            ha="center", va="center", fontsize=8.5, color="#aaccee",
-            style="italic", transform=ax.transAxes)
-
-    # Leyenda
-    for xi, (sent, lbl) in enumerate([
-        ("positive", "▲  Positiva"), ("negative", "▼  Negativa"), ("neutral", "●  Neutral")
-    ]):
-        xpos = 0.18 + xi * 0.32
-        ax.add_patch(mpatches.FancyBboxPatch((xpos - 0.12, 0.838), 0.22, 0.038,
-                     boxstyle="round,pad=0.005", fc=SENT_COLOR[sent], ec="none", alpha=0.12))
-        ax.text(xpos, 0.857, lbl, ha="center", va="center", fontsize=9,
-                fontweight="bold", color=SENT_COLOR[sent], transform=ax.transAxes)
-
-    # Header de tabla
-    ax.add_patch(mpatches.FancyBboxPatch((0.01, 0.788), 0.98, 0.040,
-                 boxstyle="square,pad=0", fc="#e8eef6", ec="none"))
-    for hdr, xp in [("Ticker", 0.08), ("▲ Pos.", 0.30),
-                    ("▼ Neg.", 0.50), ("● Neu.", 0.70), ("Balance", 0.88)]:
-        ax.text(xp, 0.808, hdr, ha="center", va="center",
-                fontsize=8, fontweight="bold", color=COLORS["text_dark"],
-                transform=ax.transAxes)
-
-    y = 0.765
-    for ticker, data in sorted(by_ticker.items()):
-        bal       = data["pos"] - data["neg"]
-        bal_color = COLORS["green"] if bal > 0 else COLORS["red"] if bal < 0 else COLORS["neutral"]
-        bal_txt   = ("+{}" if bal > 0 else "{}").format(bal)
-        row_bg    = "#f4fff4" if bal > 0 else "#fff4f4" if bal < 0 else "white"
-
-        ax.add_patch(mpatches.FancyBboxPatch((0.01, y - 0.015), 0.98, 0.028,
-                     boxstyle="square,pad=0", fc=row_bg, ec="#eeeeee"))
-        for val, xp, color, fw in [
-            (ticker,           0.08, COLORS["text_dark"], "bold"),
-            (str(data["pos"]), 0.30, COLORS["green"],     "normal"),
-            (str(data["neg"]), 0.50, COLORS["red"],       "normal"),
-            (str(data["neu"]), 0.70, COLORS["neutral"],   "normal"),
-            (bal_txt,          0.88, bal_color,           "bold"),
-        ]:
-            ax.text(xp, y, val, ha="center", va="center", fontsize=8,
-                    fontweight=fw, color=color, transform=ax.transAxes)
-        y -= 0.032
-        if y < 0.08:
-            break
-
-    ax.text(0.5, 0.03,
-            "Fuente: NewsAPI.org  |  Clasificacion automatica por palabras clave  |  "
-            "No constituyen consejo de inversion",
-            ha="center", va="bottom", fontsize=7, color=COLORS["text_gray"],
-            style="italic", transform=ax.transAxes)
-
-    figs.append(fig)
-
-    # ── Una pagina por ticker con sus titulares ───────────────────────────────
-    for ticker, data in sorted(by_ticker.items()):
-        items = data["items"]
-        if not items:
-            continue
-
-        fig, ax = plt.subplots(figsize=(8.5, 11))
-        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
-        fig.patch.set_facecolor("white")
-
-        bal       = data["pos"] - data["neg"]
-        hdr_color = "#1a5c1a" if bal > 0 else "#6a0000" if bal < 0 else "#2d4a6e"
-        bal_label = ("Sentimiento POSITIVO" if bal > 0
-                     else "Sentimiento NEGATIVO" if bal < 0
-                     else "Sentimiento NEUTRAL")
-
-        ax.add_patch(mpatches.FancyBboxPatch((0, 0.90), 1, 0.10,
-                     boxstyle="square,pad=0", fc=hdr_color, ec="none"))
-        ax.text(0.05, 0.960, f"[NOTICIAS]  {ticker}",
-                va="center", fontsize=14, fontweight="bold",
-                color="white", transform=ax.transAxes)
-        ax.text(0.05, 0.918,
-                f"{bal_label}  |  ▲ {data['pos']}  ▼ {data['neg']}  ● {data['neu']}",
-                va="center", fontsize=9, color="#dddddd", transform=ax.transAxes)
-
-        # Banner "no es analisis tecnico"
-        ax.add_patch(mpatches.FancyBboxPatch((0.01, 0.875), 0.98, 0.018,
-                     boxstyle="square,pad=0", fc="#f0f4fa", ec="none"))
-        ax.text(0.5, 0.884,
-                "Contexto macro/geopolitico — no forma parte del analisis tecnico",
-                ha="center", va="center", fontsize=7.5,
-                color="#4466aa", style="italic", transform=ax.transAxes)
-
-        y = 0.855
-        for item in items:
-            sent     = item.get("sentiment", "neutral")
-            marker   = SENT_MARKER.get(sent, "●")
-            color    = SENT_COLOR.get(sent, COLORS["neutral"])
-            title    = item.get("title", "Sin titulo")
-            source   = item.get("source", {})
-            src_name = source.get("name", "") if isinstance(source, dict) else str(source)
-            desc     = (item.get("description") or "")
-            date     = (item.get("publishedAt", "") or "")[:10]
-
-            # Barra lateral de sentimiento
-            ax.add_patch(mpatches.FancyBboxPatch((0.01, y - 0.060), 0.007, 0.065,
-                         boxstyle="square,pad=0", fc=color, ec="none", alpha=0.75))
-
-            # Fuente + fecha
-            hdr_line = f"{marker}  {src_name}" if src_name else marker
-            ax.text(0.025, y, hdr_line, va="top", fontsize=7.5,
-                    fontweight="bold", color=color, transform=ax.transAxes)
-            if date:
-                ax.text(0.92, y, date, va="top", ha="right", fontsize=7,
-                        color=COLORS["text_gray"], transform=ax.transAxes)
-
-            # Titulo (max 2 lineas)
-            title_lines = textwrap.fill(title, width=82).split("\n")[:2]
-            for li, line in enumerate(title_lines):
-                ax.text(0.025, y - 0.018 - li * 0.018, line, va="top",
-                        fontsize=8.5, color=COLORS["text_dark"],
-                        transform=ax.transAxes)
-
-            # Descripcion (1 linea, en gris)
-            if desc:
-                short_desc = textwrap.shorten(desc, width=105, placeholder="...")
-                ax.text(0.025, y - 0.054, short_desc, va="top", fontsize=7.5,
-                        color=COLORS["text_gray"], style="italic",
-                        transform=ax.transAxes)
-
-            ax.axhline(y - 0.065, xmin=0.02, xmax=0.98,
-                       color="#dddddd", linewidth=0.5)
-            y -= 0.076
-            if y < 0.04:
-                break
-
-        ax.text(0.5, 0.02, "Fuente: NewsAPI.org  |  Clasificacion automatica",
-                ha="center", va="bottom", fontsize=7,
-                color=COLORS["text_gray"], style="italic", transform=ax.transAxes)
-
-        figs.append(fig)
-
-    return figs
