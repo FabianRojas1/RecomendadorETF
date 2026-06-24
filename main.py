@@ -121,6 +121,7 @@ async def run_weekly_analysis():
                 "adx_value":        values.get("adx") or 0,
                 "current_value_cop": float(row.get("current_value", 0)),
                 "pct_portfolio":    row.get("pct_of_total_portfolio", ""),
+                "asset_type":       row.get("asset_type", "Otro"),
                 "asset_subtype":    row.get("asset_subtype", ""),
             }
 

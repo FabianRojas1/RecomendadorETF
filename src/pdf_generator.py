@@ -19,10 +19,9 @@ logger = logging.getLogger(__name__)
 # ── Paleta de colores ─────────────────────────────────────────────────────────
 COLORS = {
     "COMPRA FUERTE": "#1a7a1a",
-    "COMPRA":        "#2ea82e",
-    "COMPRA DEBIL":  "#7ec87e",
+    "COMPRA DEBIL":  "#5cbd5c",
     "MANTENER":      "#888888",
-    "VENTA DEBIL":   "#e08050",
+    "VENTA DEBIL":   "#e07030",
     "VENTA":         "#d05000",
     "VENTA FUERTE":  "#b00000",
     "bg_header":     "#1e1e4a",
@@ -65,8 +64,7 @@ def generate_report_pdf(
                           key=lambda x: -x.get("score", 0))
         ventas   = sorted([r for r in recommendations if "VENTA"  in r.get("action","")],
                           key=lambda x:  x.get("score", 0))
-        mantener = sorted([r for r in recommendations if "MANTENER" in r.get("action","")],
-                          key=lambda x: -abs(x.get("score", 0)))
+        mantener = [r for r in recommendations if r.get("action","") == "MANTENER"]
 
         with PdfPages(output_path) as pdf:
             # Portada
@@ -75,7 +73,11 @@ def generate_report_pdf(
                         bbox_inches="tight")
             plt.close("all")
 
-            # Gráfica del portafolio
+            # Gráfica distribución por tipo de activo (2 pies: actual vs proyectado)
+            pdf.savefig(_make_asset_type_chart(recommendations), bbox_inches="tight")
+            plt.close("all")
+
+            # Gráfica distribución por señal
             pdf.savefig(_make_portfolio_chart(recommendations), bbox_inches="tight")
             plt.close("all")
 
@@ -117,6 +119,158 @@ def generate_report_pdf(
 
 # ── Páginas ───────────────────────────────────────────────────────────────────
 
+def _make_asset_type_chart(recs: list):
+    """
+    Página: Distribución por tipo de activo (asset_type).
+      - Izquierda: pie actual (COP por asset_type)
+      - Derecha:   pie proyectado después de ejecutar señales
+        VENTA FUERTE → retiene 0%
+        VENTA DEBIL  → retiene 50%
+        COMPRA FUERTE → crece +25%
+        COMPRA DEBIL  → crece +10%
+        MANTENER      → sin cambio
+    """
+    RETAIN = {
+        "COMPRA FUERTE": 1.25,
+        "COMPRA DEBIL":  1.10,
+        "MANTENER":      1.00,
+        "VENTA DEBIL":   0.50,
+        "VENTA FUERTE":  0.00,
+    }
+    ASSET_COLORS = {
+        "Crecimiento":        "#2196F3",
+        "Defensiva":          "#4CAF50",
+        "Materias Primas":    "#FF9800",
+        "Sectorial":          "#9C27B0",
+        "Otro":               "#9E9E9E",
+    }
+
+    # Agrupar valores actuales y proyectados por asset_type
+    current_by_type:   dict = {}
+    projected_by_type: dict = {}
+
+    for r in recs:
+        atype  = r.get("asset_type", "Otro") or "Otro"
+        action = r.get("action", "MANTENER")
+        val    = float(r.get("current_value_cop", 0) or 0)
+        factor = RETAIN.get(action, 1.0)
+
+        current_by_type[atype]   = current_by_type.get(atype, 0)   + val
+        projected_by_type[atype] = projected_by_type.get(atype, 0) + val * factor
+
+    all_types  = sorted(set(list(current_by_type) + list(projected_by_type)))
+    cur_vals   = [current_by_type.get(t, 0)   for t in all_types]
+    proj_vals  = [projected_by_type.get(t, 0) for t in all_types]
+    pie_colors = [ASSET_COLORS.get(t, "#9E9E9E") for t in all_types]
+
+    total_cur  = sum(cur_vals)  or 1
+    total_proj = sum(proj_vals) or 1
+
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.93, 1, 0.07])
+    ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=COLORS["bg_header"], ec="none"))
+    ax_h.text(0.5, 0.6, "Distribución por Tipo de Activo",
+              ha="center", va="center", fontsize=14, fontweight="bold", color="white")
+    ax_h.text(0.5, 0.18,
+              "Izquierda: portafolio actual  |  Derecha: proyección después de ejecutar señales",
+              ha="center", va="center", fontsize=8.5, color="#aaaadd")
+
+    # ── Pie ACTUAL ────────────────────────────────────────────────────────────
+    ax_cur = fig.add_axes([0.02, 0.55, 0.46, 0.35])
+    w1, _, at1 = ax_cur.pie(
+        cur_vals, colors=pie_colors,
+        autopct=lambda p: f"{p:.1f}%" if p > 4 else "",
+        startangle=90, pctdistance=0.72,
+        wedgeprops={"edgecolor": "white", "linewidth": 1.5},
+    )
+    for at in at1:
+        at.set_fontsize(8); at.set_color("white"); at.set_fontweight("bold")
+    ax_cur.set_title(f"Actual\nCOP ${total_cur:,.0f}", fontsize=10,
+                     fontweight="bold", color=COLORS["text_dark"], pad=6)
+    ax_cur.legend(w1, all_types, loc="lower center",
+                  bbox_to_anchor=(0.5, -0.14), fontsize=8, frameon=False, ncol=2)
+
+    # ── Pie PROYECTADO ────────────────────────────────────────────────────────
+    ax_prj = fig.add_axes([0.52, 0.55, 0.46, 0.35])
+    w2, _, at2 = ax_prj.pie(
+        proj_vals, colors=pie_colors,
+        autopct=lambda p: f"{p:.1f}%" if p > 4 else "",
+        startangle=90, pctdistance=0.72,
+        wedgeprops={"edgecolor": "white", "linewidth": 1.5},
+    )
+    for at in at2:
+        at.set_fontsize(8); at.set_color("white"); at.set_fontweight("bold")
+    delta_cop = total_proj - total_cur
+    delta_str = f"+COP ${delta_cop:,.0f}" if delta_cop >= 0 else f"-COP ${abs(delta_cop):,.0f}"
+    ax_prj.set_title(f"Proyectado ({delta_str})\nCOP ${total_proj:,.0f}", fontsize=10,
+                     fontweight="bold", color=COLORS["text_dark"], pad=6)
+    ax_prj.legend(w2, all_types, loc="lower center",
+                  bbox_to_anchor=(0.5, -0.14), fontsize=8, frameon=False, ncol=2)
+
+    # ── Tabla de impacto por activo ───────────────────────────────────────────
+    ax_t = fig.add_axes([0.02, 0.06, 0.96, 0.46])
+    ax_t.axis("off")
+    ax_t.text(0, 0.99, "Impacto por activo (solo señales con efecto):",
+              fontsize=10, fontweight="bold", color=COLORS["text_dark"],
+              va="top", transform=ax_t.transAxes)
+
+    impact_recs = [r for r in recs if r.get("action","MANTENER") != "MANTENER"]
+    impact_recs.sort(key=lambda x: -abs(x.get("score", 0)))
+
+    tbl_data = []
+    tbl_row_colors = []
+    for r in impact_recs[:18]:
+        action  = r.get("action", "")
+        val     = float(r.get("current_value_cop", 0) or 0)
+        factor  = RETAIN.get(action, 1.0)
+        proj    = val * factor
+        delta   = proj - val
+        delta_s = f"+{delta:,.0f}" if delta >= 0 else f"{delta:,.0f}"
+        tbl_data.append([
+            r.get("ticker", ""),
+            r.get("asset_type", ""),
+            action,
+            f"{r.get('score', 0):+.1f}",
+            f"{val:,.0f}",
+            f"{proj:,.0f}",
+            delta_s,
+        ])
+        c = COLORS.get(action, COLORS["MANTENER"])
+        tbl_row_colors.append([c, "#f5f5f5", c, "#f5f5f5", "#f5f5f5", "#f5f5f5", "#f5f5f5"])
+
+    if tbl_data:
+        tbl = ax_t.table(
+            cellText=tbl_data,
+            colLabels=["Ticker", "Tipo", "Señal", "Score", "Actual COP", "Proy. COP", "Delta"],
+            loc="upper center", bbox=[0, 0, 1, 0.95],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(7.5)
+        tbl.auto_set_column_width(list(range(7)))
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#2d3a5a")
+                cell.set_text_props(fontweight="bold", color="white")
+            elif r <= len(tbl_row_colors):
+                cell.set_facecolor(tbl_row_colors[r-1][c])
+                if c in (0, 2):
+                    cell.set_text_props(color="white", fontweight="bold")
+
+    # ── Nota de proyección ────────────────────────────────────────────────────
+    ax_n = fig.add_axes([0.02, 0.02, 0.96, 0.04])
+    ax_n.axis("off")
+    ax_n.text(0.5, 0.5,
+              "Proyección asume: VENTA FUERTE -100% | VENTA DEBIL -50% | "
+              "COMPRA FUERTE +25% | COMPRA DEBIL +10% | MANTENER sin cambio",
+              ha="center", va="center", fontsize=7, color="#888888", style="italic")
+    return fig
+
+
 def _make_portfolio_chart(recs: list):
     """
     Página 2: Vista del portafolio por tipo de acción.
@@ -124,9 +278,9 @@ def _make_portfolio_chart(recs: list):
       - Derecha:   barras horizontales (% del portafolio en COP)
       - Abajo:     tabla de top activos por score absoluto
     """
-    ORDER  = ["COMPRA FUERTE", "COMPRA", "MANTENER", "VENTA", "VENTA FUERTE"]
-    CLABEL = {"COMPRA FUERTE": "Compra\nFuerte", "COMPRA": "Compra",
-              "MANTENER": "Mantener", "VENTA": "Venta", "VENTA FUERTE": "Venta\nFuerte"}
+    ORDER  = ["COMPRA FUERTE", "COMPRA DEBIL", "MANTENER", "VENTA DEBIL", "VENTA FUERTE"]
+    CLABEL = {"COMPRA FUERTE": "Compra\nFuerte", "COMPRA DEBIL": "Compra\nDebil",
+              "MANTENER": "Mantener", "VENTA DEBIL": "Venta\nDebil", "VENTA FUERTE": "Venta\nFuerte"}
 
     # Agrupar
     groups: dict[str, list] = {k: [] for k in ORDER}
@@ -279,8 +433,8 @@ def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant):
 
     # Signal summary
     for i, (label, n, color) in enumerate([
-        ("COMPRAS", n_comp, COLORS["COMPRA"]),
-        ("VENTAS",  n_vent, COLORS["VENTA"]),
+        ("COMPRAS", n_comp, COLORS["COMPRA FUERTE"]),
+        ("VENTAS",  n_vent, COLORS["VENTA FUERTE"]),
         ("MANTENER",n_mant, COLORS["MANTENER"]),
     ]):
         x = 0.18 + i * 0.32

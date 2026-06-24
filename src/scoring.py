@@ -65,9 +65,9 @@ class Scorer:
 
     def _action(self, score: float) -> str:
         if   score >= 15:  return "COMPRA FUERTE"
-        elif score >= 5:   return "COMPRA"
+        elif score >= 5:   return "COMPRA DEBIL"
         elif score <= -15: return "VENTA FUERTE"
-        elif score <= -5:  return "VENTA"
+        elif score <= -5:  return "VENTA DEBIL"
         return "MANTENER"
 
     # =========================================================================

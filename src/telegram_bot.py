@@ -219,7 +219,11 @@ def _fmt_news_summary(recommendations: list) -> str:
                 total_with_news, total_with_confirming, len(relevant))
 
     if not relevant:
-        return ""
+        return (
+            "📰 <b>NOTICIAS</b>\n\n"
+            "<i>No se encontraron noticias que confirmen señales de compra/venta para hoy.</i>\n"
+            f"<i>(Se revisaron {total_with_news} tickers con señal activa)</i>"
+        )
 
     relevant.sort(key=lambda x: -abs(x["score"]))
 
