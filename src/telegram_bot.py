@@ -241,10 +241,15 @@ def _fmt_news_summary(recommendations: list) -> str:
             title  = (news_item.get("title") or "").strip()
             source = news_item.get("source", {})
             src    = source.get("name", "") if isinstance(source, dict) else str(source)
-            if len(title) > 100:
-                title = title[:97] + "..."
-            src_txt = f"  <i>{src}</i>" if src else ""
-            lines.append(f"    • {title}{src_txt}")
+            url    = (news_item.get("url") or "").strip()
+            pub    = news_item.get("published_at", "")
+            if len(title) > 90:
+                title = title[:87] + "..."
+            # Título como link si hay URL disponible
+            title_part = f'<a href="{url}">{title}</a>' if url else title
+            meta = " | ".join(filter(None, [src, pub]))
+            meta_txt = f"  <i>{meta}</i>" if meta else ""
+            lines.append(f"    • {title_part}{meta_txt}")
 
         lines.append("")
 
@@ -365,7 +370,7 @@ async def send_test_message(bot_token: str, chat_id: str) -> bool:
             f"<i>{datetime.now(BOGOTA_TZ).strftime('%d/%m/%Y %H:%M')}</i>\n\n"
             "Funciones activas:\n"
             "• Análisis semanal (domingos 19:00 Bogotá)\n"
-            "• Alertas de precio (movimientos > 5%)\n"
+            "• Alertasde precio (movimientos > 5%)\n"
             "• PDF con reporte completo de 25 activos"
         )
         await bot.send_message(chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
