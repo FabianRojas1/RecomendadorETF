@@ -245,11 +245,11 @@ def _fmt_news_summary(recommendations: list) -> str:
             pub    = news_item.get("published_at", "")
             if len(title) > 90:
                 title = title[:87] + "..."
-            # Título como link si hay URL disponible
-            title_part = f'<a href="{url}">{title}</a>' if url else title
             meta = " | ".join(filter(None, [src, pub]))
-            meta_txt = f"  <i>{meta}</i>" if meta else ""
-            lines.append(f"    • {title_part}{meta_txt}")
+            meta_txt = f" <i>{meta}</i>" if meta else ""
+            lines.append(f"    • <b>{title}</b>{meta_txt}")
+            if url:
+                lines.append(f"      🔗 {url}")
 
         lines.append("")
 
