@@ -299,19 +299,19 @@ def _make_ticker_page(rec: dict):
     rows, row_colors = [], []
     for key, comp in comps.items():
         label   = INDICATOR_LABELS.get(key, key)
-        pts     = comp.get("weighted_score", 0)
-        signal  = comp.get("signal", "—")
-        details = comp.get("details", "")
+        pts     = float(comp.get("weighted_score", 0) or 0)
+        signal  = str(comp.get("signal", "") or "")
+        details = str(comp.get("details", "") or "")
         rows.append([label, f"{pts:+.1f}", signal,
                      textwrap.shorten(details, width=55, placeholder="...")])
         rc = "#e8f5e8" if pts > 0 else "#fde8e8" if pts < 0 else "#f5f5f5"
         row_colors.append([rc, rc, rc, rc])
 
     if rows:
+        # cellColours se aplica manualmente por celda para evitar errores de conteo
         tbl = ax_t.table(
             cellText=rows,
             colLabels=["Indicador", "Pts", "Señal", "Detalle"],
-            cellColours=row_colors,
             loc="center", bbox=[0, 0, 1, 0.90],
         )
         tbl.auto_set_font_size(False); tbl.set_fontsize(8)
@@ -321,6 +321,8 @@ def _make_ticker_page(rec: dict):
             if r == 0:
                 cell.set_facecolor("#ddddee")
                 cell.set_text_props(fontweight="bold")
+            elif r <= len(row_colors):
+                cell.set_facecolor(row_colors[r - 1][c])
 
     # ── Razones ───────────────────────────────────────────────────────────────
     if reasons:
