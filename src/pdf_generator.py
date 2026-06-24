@@ -98,17 +98,6 @@ def generate_report_pdf(
                 pdf.savefig(_make_mantener_page(mantener), bbox_inches="tight")
                 plt.close("all")
 
-            # Noticias
-            all_news = []
-            for r in recommendations:
-                for n in r.get("news", []):
-                    n["ticker"] = r.get("ticker", "")
-                    all_news.append(n)
-            if all_news:
-                for fig in _make_news_pages(all_news, recommendations):
-                    pdf.savefig(fig, bbox_inches="tight")
-                    plt.close("all")
-
             # Metadata
             d = pdf.infodict()
             d["Title"]   = "Reporte Semanal de Inversiones"
@@ -322,7 +311,7 @@ def _make_ticker_page(rec: dict):
         tbl = ax_t.table(
             cellText=rows,
             colLabels=["Indicador", "Pts", "Señal", "Detalle"],
-            cellColours=row_colors,
+            cellColours=row_colors + [["#eeeeee"]*4],
             loc="center", bbox=[0, 0, 1, 0.90],
         )
         tbl.auto_set_font_size(False); tbl.set_fontsize(8)
