@@ -1,16 +1,17 @@
 """
 scoring.py — Motor de scoring con estrategia Trading Latino integrada.
 
-Lógica de confirmación (semanal):
-  COMPRA : Squeeze liberado + histograma VERDE (subiendo) + ADX > 25 + DI+ > DI-
-           Apoyado por RSI < 70 y volumen alcista
-  VENTA  : Squeeze liberado + histograma ROJO  (bajando) + ADX > 25 + DI- > DI+
-           Apoyado por RSI > 30 y volumen bajista
+Evaluadores (5):
+  moving_averages  peso 2.5  EMA10/55 + SMA50/200 diario
+  squeeze_adx      peso 4.0  Squeeze LazyBear + ADX semanal (Trading Latino)
+  rsi              peso 2.0  RSI 14 semanal (filtro y confirmacion)
+  volume           peso 2.0  OBV/VWAP/CMF diario
+  news             peso 1.5  Sentimiento de noticias
 
-Score total: -40 a +40 (capped). Umbrales:
-  COMPRA FUERTE  >= +25 | COMPRA  >= +15 | COMPRA DEBIL  >= +5
-  MANTENER       en [-4, +4]
-  VENTA DEBIL    <= -5  | VENTA   <= -15 | VENTA FUERTE  <= -25
+Score capped en [-40, +40].
+  COMPRA FUERTE >= +25 | COMPRA >= +15 | COMPRA DEBIL >= +5
+  MANTENER [-4, +4]
+  VENTA DEBIL <= -5 | VENTA <= -15 | VENTA FUERTE <= -25
 """
 import logging
 from typing import Dict, Any, Optional
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 WEIGHTS = {
     "moving_averages": 2.5,
-    "squeeze_adx":     4.0,   # Squeeze + ADX como unidad (Trading Latino)
+    "squeeze_adx":     4.0,
     "rsi":             2.0,
     "volume":          2.0,
     "news":            1.5,
@@ -72,7 +73,6 @@ class ScoringEngine:
                     "signal": "error", "details": str(e),
                 }
 
-        # Cap en ±40 para consistencia con el label
         total = max(-40.0, min(40.0, round(raw_total, 2)))
 
         return {
@@ -114,7 +114,7 @@ class ScoringEngine:
             "reasons":          self._build_reasons(components, values),
             "explanation":      self._build_explanation(action, total, confidence),
             "news":             news_data[:5],
-            # Extras para is_strong_signal en telegram_bot
+            # Extras para telegram_bot y pdf_generator
             "squeeze_state":    values.get("squeeze_state", ""),
             "sqzm_color":       values.get("sqzm_color", "unknown"),
             "sqzm_valley":      values.get("sqzm_valley", False),
@@ -126,7 +126,7 @@ class ScoringEngine:
             "squeeze_tf":       values.get("squeeze_tf", ""),
         }
 
-    # ── Acción ────────────────────────────────────────────────────────────────
+    # ── Accion ────────────────────────────────────────────────────────────────
 
     def _action_from_score(self, score: float) -> str:
         t = THRESHOLDS
@@ -141,7 +141,7 @@ class ScoringEngine:
     # ── Evaluadores ───────────────────────────────────────────────────────────
 
     def _eval_ma(self, values: dict, _) -> tuple:
-        """Medias Móviles — DIARIO (EMA 10/55 + SMA 50/200)."""
+        """Medias Moviles diarias — EMA 10/55 (Trading Latino) + SMA 50/200."""
         close  = values.get("close")
         ema10  = values.get("ema_10")
         ema55  = values.get("ema_55")
@@ -154,21 +154,18 @@ class ScoringEngine:
         score = 0
         notes = []
 
-        # EMA 10 vs EMA 55 (Trading Latino)
         if ema10 and ema55:
             if ema10 > ema55:
                 score += 4; notes.append("EMA10 > EMA55 (alcista)")
             else:
                 score -= 4; notes.append("EMA10 < EMA55 (bajista)")
 
-        # Precio vs SMA 200 (tendencia de largo plazo)
         if sma200:
             if close > sma200:
                 score += 2; notes.append("Precio > SMA200")
             else:
                 score -= 2; notes.append("Precio < SMA200")
 
-        # Golden/Death Cross (SMA 50 vs 200)
         if sma50 and sma200:
             if sma50 > sma200:
                 score += 2; notes.append("Golden Cross SMA50/200")
@@ -181,66 +178,71 @@ class ScoringEngine:
     def _eval_squeeze_adx(self, values: dict, _) -> tuple:
         """
         Squeeze Momentum LazyBear + ADX — SEMANAL.
-        Implementa la lógica de Trading Latino para inversión a mediano plazo.
+        Implementacion de la estrategia de Trading Latino.
 
-        Puntuación máxima: ±8 (antes del peso 4.0 → ±32 puntos en total)
-
-        Señal COMPRA (Trading Latino):
-          Squeeze liberado + histograma VERDE (subiendo) + ADX > 25 + DI+ > DI-
-          Bonus si es VALLE (primera barra verde) → entrada ideal
-
-        Señal VENTA:
-          Squeeze liberado + histograma ROJO (bajando) + ADX > 25 + DI- > DI+
-          Bonus si es PICO (primera barra roja) → entrada ideal
+        REGLA CLAVE: si squeeze_state == 'no_squeeze' (activo en tendencia libre
+        sin compresion previa, como QTUM subiendo sin squeeze) -> 0 puntos.
+        Evita contar como senal valida activos que simplemente estan en trend.
         """
-        sq_state   = values.get("squeeze_state",  "unknown")
-        sqzm_color = values.get("sqzm_color",     "unknown")
-        sqzm_val   = values.get("sqzm_val")
-        sqzm_valley= values.get("sqzm_valley",    False)
-        sqzm_peak  = values.get("sqzm_peak",      False)
-        adx        = values.get("adx")   or 0
-        plus_di    = values.get("plus_di")  or 0
-        minus_di   = values.get("minus_di") or 0
-        tf         = values.get("squeeze_tf", "")
+        sq_state    = values.get("squeeze_state",  "unknown")
+        sqzm_color  = values.get("sqzm_color",     "unknown")
+        sqzm_valley = values.get("sqzm_valley",    False)
+        sqzm_peak   = values.get("sqzm_peak",      False)
+        adx         = values.get("adx")   or 0
+        plus_di     = values.get("plus_di")  or 0
+        minus_di    = values.get("minus_di") or 0
+        tf          = values.get("squeeze_tf", "")
 
         score = 0
         notes = []
         entry_tag = ""
 
-        # ── 1. Fuerza de tendencia (ADX) ─────────────────────────────────────
+        # ── BLOQUEO: sin compresion previa valida ─────────────────────────────
+        if sq_state == "no_squeeze":
+            return 0, {
+                "signal":  "sin setup",
+                "details": (
+                    "Sin compresion previa valida — activo en tendencia libre, "
+                    "Trading Latino no aplica"
+                ),
+            }
+
+        # ── Fuerza de tendencia (ADX) ─────────────────────────────────────────
         if   adx >= 40: adx_score = 3
         elif adx >= 25: adx_score = 2
         elif adx >= 20: adx_score = 1
-        else:           adx_score = 0   # Mercado lateral — no operar
-
-        if adx_score == 0:
+        else:
             return 0, {
                 "signal":  "lateral",
                 "details": f"ADX {adx:.1f} < 20 — sin tendencia, esperar ({tf})",
             }
 
-        # ── 2. Dirección de la tendencia (DI+ vs DI-) ─────────────────────
+        # ── Direccion de la tendencia (DI+ vs DI-) ────────────────────────────
+        di_diff = plus_di - minus_di
+        di_cross_bearish = (minus_di > plus_di) and ((minus_di - plus_di) > 3)
+        di_cross_bullish = (plus_di  > minus_di) and ((plus_di - minus_di)  > 3)
+
         if plus_di > minus_di:
             trend_dir = 1
             notes.append(f"DI+ {plus_di:.1f} > DI- {minus_di:.1f} (alcista)")
         elif minus_di > plus_di:
             trend_dir = -1
             notes.append(f"DI- {minus_di:.1f} > DI+ {plus_di:.1f} (bajista)")
+            if di_cross_bearish:
+                notes.append("ATENCION: cruce bajista DI — considerar salida")
         else:
             trend_dir = 0
 
-        # ── 3. Histograma Squeeze (LazyBear) ─────────────────────────────────
+        # ── Histograma Squeeze (LazyBear) ─────────────────────────────────────
         sqzm_score = 0
 
         if sq_state in ("released", "expanding"):
-            # Histograma verde (momentum alcista)
             if sqzm_color == "green_strong":
                 sqzm_score = 4
                 notes.append("SQZM histograma verde subiendo")
             elif sqzm_color == "green_weak":
                 sqzm_score = 2
-                notes.append("SQZM histograma verde debilitando")
-            # Histograma rojo (momentum bajista)
+                notes.append("SQZM histograma verde debilitando — precaucion")
             elif sqzm_color == "red_strong":
                 sqzm_score = -4
                 notes.append("SQZM histograma rojo bajando")
@@ -248,29 +250,30 @@ class ScoringEngine:
                 sqzm_score = -2
                 notes.append("SQZM histograma rojo debilitando")
 
-            # Bonus por entrada de valle/pico (Trading Latino)
             if sqzm_valley and sqzm_score > 0:
                 sqzm_score += 1
-                entry_tag = " | ENTRADA VALLE ⚡ (señal Trading Latino)"
+                entry_tag = " | ENTRADA VALLE (senal optima Trading Latino)"
             elif sqzm_peak and sqzm_score < 0:
                 sqzm_score -= 1
-                entry_tag = " | ENTRADA PICO ⚡ (señal Trading Latino)"
+                entry_tag = " | ENTRADA PICO (senal optima Trading Latino)"
+
+            # Penalizacion si DI cruza en contra del histograma
+            if (sqzm_score > 0 and di_cross_bearish) or (sqzm_score < 0 and di_cross_bullish):
+                sqzm_score = round(sqzm_score * 0.4)
+                notes.append("DI cruza contra histograma — senal degradada")
 
         elif sq_state == "compressed":
-            notes.append("SQZM comprimido — esperando liberación")
-            sqzm_score = 0   # Presión acumulada, aún no es señal
+            notes.append("SQZM comprimido — acumulando presion, esperando liberacion")
+            sqzm_score = 0
 
-        # ── 4. Score final = ADX confirma dirección × histograma ─────────────
-        # Solo sumar si ADX y histograma apuntan en la misma dirección
+        # ── Score final ────────────────────────────────────────────────────────
         if (sqzm_score > 0 and trend_dir >= 0) or (sqzm_score < 0 and trend_dir <= 0):
             score = (adx_score + abs(sqzm_score)) * trend_dir
         else:
-            # Divergencia ADX/histograma → señal débil
-            score = round((adx_score + abs(sqzm_score)) * trend_dir * 0.3)
+            score = round((adx_score + abs(sqzm_score)) * trend_dir * 0.2)
             notes.append("Divergencia DI/histograma")
 
-        score = max(-8, min(8, score))  # Cap por componente
-
+        score = max(-8, min(8, score))
         notes.append(f"ADX {adx:.1f} ({tf})")
         if entry_tag:
             notes.append(entry_tag)
@@ -282,16 +285,10 @@ class ScoringEngine:
             "bearish"        if score <= -2 else
             "neutral"
         )
-
         return score, {"signal": signal, "details": " | ".join(notes)}
 
     def _eval_rsi(self, values: dict, _) -> tuple:
-        """
-        RSI 14 — SEMANAL. Actúa como filtro y confirmación:
-          - RSI muy sobrecomprado (>70): reduce señal de compra
-          - RSI muy sobrevendido (<30): reduce señal de venta
-          - RSI en zona media: apoya la dirección del Squeeze
-        """
+        """RSI 14 semanal — filtro y confirmacion."""
         rsi = values.get("rsi")
         tf  = values.get("rsi_tf", "")
 
@@ -299,17 +296,17 @@ class ScoringEngine:
             return 0, {"signal": "sin datos", "details": ""}
 
         if   rsi >= 75: score, signal = -4, "sobrecompra extrema — evitar COMPRA"
-        elif rsi >= 70: score, signal =  0, "sobrecompra — precaución"
+        elif rsi >= 70: score, signal =  0, "sobrecompra — precaucion"
         elif rsi >= 60: score, signal =  3, "zona alcista"
         elif rsi >= 45: score, signal =  1, "zona neutral-alcista"
         elif rsi >= 35: score, signal = -1, "zona neutral-bajista"
-        elif rsi >= 30: score, signal =  0, "sobreventa — precaución"
+        elif rsi >= 30: score, signal =  0, "sobreventa — precaucion"
         else:           score, signal =  4, "sobreventa extrema — evitar VENTA"
 
         return score, {"signal": signal, "details": f"RSI {rsi:.1f} ({tf})"}
 
     def _eval_volume(self, values: dict, _) -> tuple:
-        """Volumen (OBV / VWAP / CMF) — DIARIO. Confirma dirección."""
+        """Volumen diario — OBV / VWAP / CMF."""
         obv_s  = values.get("obv_signal",  "neutral")
         vwap_s = values.get("vwap_signal", "neutral")
         cmf    = values.get("cmf", 0.0) or 0.0
@@ -338,7 +335,7 @@ class ScoringEngine:
         return score, {"signal": signal, "details": " | ".join(notes) + f" ({tf})"}
 
     def _eval_news(self, _, news_data: list) -> tuple:
-        """Contexto de noticias — sentimiento agregado."""
+        """Sentimiento de noticias."""
         if not news_data:
             return 0, {"signal": "sin noticias", "details": ""}
 
@@ -361,15 +358,23 @@ class ScoringEngine:
     # ── Targets y Stop Loss ───────────────────────────────────────────────────
 
     def _calc_target(self, price: float, action: str) -> Optional[float]:
-        if not price: return None
-        pct = {"COMPRA FUERTE": .10, "COMPRA": .08, "COMPRA DEBIL": .05,
-               "VENTA FUERTE": -.10, "VENTA": -.08, "VENTA DEBIL": -.05}.get(action)
+        if not price:
+            return None
+        pct_map = {
+            "COMPRA FUERTE": 0.10, "COMPRA": 0.08, "COMPRA DEBIL": 0.05,
+            "VENTA FUERTE": -0.10, "VENTA": -0.08, "VENTA DEBIL": -0.05,
+        }
+        pct = pct_map.get(action)
         return round(price * (1 + pct), 2) if pct is not None else None
 
     def _calc_stop_loss(self, price: float, action: str) -> Optional[float]:
-        if not price: return None
-        pct = {"COMPRA FUERTE": -.05, "COMPRA": -.06, "COMPRA DEBIL": -.07,
-               "VENTA FUERTE":  .05,  "VENTA":  .06,  "VENTA DEBIL":  .07}.get(action)
+        if not price:
+            return None
+        pct_map = {
+            "COMPRA FUERTE": -0.05, "COMPRA": -0.06, "COMPRA DEBIL": -0.07,
+            "VENTA FUERTE":   0.05, "VENTA":   0.06, "VENTA DEBIL":   0.07,
+        }
+        pct = pct_map.get(action)
         return round(price * (1 + pct), 2) if pct is not None else None
 
     # ── Textos ────────────────────────────────────────────────────────────────
@@ -379,9 +384,10 @@ class ScoringEngine:
         for key, comp in components.items():
             wsc = comp.get("weighted_score", 0)
             det = comp.get("details", "") or comp.get("signal", "")
-            if abs(wsc) < 1: continue
-            icon = "+" if wsc > 0 else "-"
-            reasons.append(f"[{icon}] {det}")
+            if abs(wsc) < 1:
+                continue
+            icon = "[+]" if wsc > 0 else "[-]"
+            reasons.append(f"{icon} {det}")
         return reasons[:6]
 
     def _build_explanation(self, action: str, score: float, confidence: dict) -> str:
