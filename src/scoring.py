@@ -1,22 +1,28 @@
 """
-scoring.py — Motor de scoring con estrategia Trading Latino integrada.
+scoring.py - Evaluadores orientados a CAMBIOS de tendencia.
 
-Evaluadores (5):
-  moving_averages  peso 2.5  EMA10/55 + SMA50/200 diario
-  squeeze_adx      peso 4.0  Squeeze LazyBear + ADX semanal (Trading Latino)
-  rsi              peso 2.0  RSI 14 semanal (filtro y confirmacion)
-  volume           peso 2.0  OBV/VWAP/CMF diario
-  news             peso 1.5  Sentimiento de noticias
+  Filosofia: score ALTO = cambio reciente / score BAJO = tendencia establecida.
 
-Score capped en [-40, +40].
-  COMPRA FUERTE >= +25 | COMPRA >= +15 | COMPRA DEBIL >= +5
-  MANTENER [-4, +4]
-  VENTA DEBIL <= -5 | VENTA <= -15 | VENTA FUERTE <= -25
+  Pesos:
+    moving_averages  x2.5  EMA 50/200 - proximidad al cruce
+    squeeze_adx      x4.0  Pico de valle / pico de montana + ADX
+    rsi              x2.0  Agotamiento alcista/bajista + divergencias
+    volume           x2.0  Conviccion detras del cambio
+    news             x1.5  Sentimiento geopolitico
+
+  Score final: [-40, +40]
+    >= +15  COMPRA FUERTE
+    +5..+14 COMPRA
+    -4..+4  MANTENER
+    -5..-14 VENTA
+    <= -15  VENTA FUERTE
 """
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+SCORE_CAP = 40.0
 
 WEIGHTS = {
     "moving_averages": 2.5,
@@ -26,372 +32,424 @@ WEIGHTS = {
     "news":            1.5,
 }
 
-THRESHOLDS = {
-    "buy_strong":   25,
-    "buy":          15,
-    "buy_weak":      5,
-    "hold_lower":   -4,
-    "sell_weak":    -5,
-    "sell":        -15,
-    "sell_strong": -25,
-}
 
+class Scorer:
 
-class ScoringEngine:
-
-    def calculate_score(self, values: dict, news_data: list) -> dict:
-        evaluators = [
-            ("moving_averages", self._eval_ma,          WEIGHTS["moving_averages"]),
-            ("squeeze_adx",     self._eval_squeeze_adx, WEIGHTS["squeeze_adx"]),
-            ("rsi",             self._eval_rsi,         WEIGHTS["rsi"]),
-            ("volume",          self._eval_volume,      WEIGHTS["volume"]),
-            ("news",            self._eval_news,        WEIGHTS["news"]),
-        ]
-
-        components = {}
-        raw_total  = 0.0
-        signals_active = 0
-
-        for key, fn, weight in evaluators:
+    def score(self, values: dict, news_items: list) -> dict:
+        evaluators = {
+            "moving_averages": self._eval_ma,
+            "squeeze_adx":     self._eval_squeeze_adx,
+            "rsi":             self._eval_rsi,
+            "volume":          self._eval_volume,
+            "news":            self._eval_news,
+        }
+        breakdown = {}
+        raw_total = 0.0
+        for key, fn in evaluators.items():
             try:
-                raw, detail = fn(values, news_data)
-                weighted    = raw * weight
-                raw_total  += weighted
-                components[key] = {
-                    "raw_score":      raw,
-                    "weight":         weight,
-                    "weighted_score": round(weighted, 2),
-                    "signal":         detail.get("signal", "neutral"),
-                    "details":        detail.get("details", ""),
-                }
-                if abs(raw) >= 1:
-                    signals_active += 1
+                raw, detail = fn(values, news_items)
             except Exception as e:
-                logger.debug("Evaluator %s error: %s", key, e)
-                components[key] = {
-                    "raw_score": 0, "weight": weight, "weighted_score": 0,
-                    "signal": "error", "details": str(e),
-                }
+                logger.warning("Evaluador %s error: %s", key, e)
+                raw, detail = 0, {"signal": "error", "details": str(e)}
+            weighted   = round(raw * WEIGHTS[key], 2)
+            raw_total += weighted
+            breakdown[key] = {
+                "raw":      raw,
+                "weight":   WEIGHTS[key],
+                "weighted": weighted,
+                **detail,
+            }
+        total  = max(-SCORE_CAP, min(SCORE_CAP, round(raw_total, 2)))
+        action = self._action(total)
+        return {"score": total, "action": action, "breakdown": breakdown}
 
-        total = max(-40.0, min(40.0, round(raw_total, 2)))
+    def _action(self, score: float) -> str:
+        if   score >= 15:  return "COMPRA FUERTE"
+        elif score >= 5:   return "COMPRA"
+        elif score <= -15: return "VENTA FUERTE"
+        elif score <= -5:  return "VENTA"
+        return "MANTENER"
 
-        return {
-            "total":      total,
-            "components": components,
-            "confidence": {
-                "score": signals_active,
-                "total": len(evaluators),
-                "pct":   round(signals_active / len(evaluators) * 10),
-            },
-        }
+    # =========================================================================
+    # 1. EMA 50/200 - Proximidad + velocidad hacia el cruce
+    #
+    # Filosofia: el cruce es indicador REZAGADO.
+    # Cuando cruza, la tendencia ya lleva semanas establecida.
+    # La senal mas valiosa es detectar que el cruce SE ACERCA.
+    # =========================================================================
 
-    def generate_recommendation(
-        self,
-        ticker: str,
-        score_data: dict,
-        values: dict,
-        news_data: list,
-        cop_rate: float,
-    ) -> dict:
-        total      = score_data["total"]
-        components = score_data["components"]
-        confidence = score_data["confidence"]
-        action     = self._action_from_score(total)
+    def _eval_ma(self, values: dict, _: Any) -> tuple:
+        gc          = values.get("days_since_golden_cross")
+        dc          = values.get("days_since_death_cross")
+        gap_pct     = values.get("ema_gap_pct")
+        gap_closing = values.get("ema_gap_closing", False)
+        gap_vel     = values.get("ema_gap_velocity")
+        ema50       = values.get("ema_50")
+        ema200      = values.get("ema_200")
+        tf          = values.get("ma_tf", "")
 
-        price_usd = values.get("close") or 0
-        price_cop = price_usd * cop_rate if price_usd else 0
-
-        return {
-            "ticker":           ticker,
-            "action":           action,
-            "score":            total,
-            "score_components": components,
-            "confidence":       confidence,
-            "price_usd":        round(price_usd, 2),
-            "price_cop":        round(price_cop, 0),
-            "target_usd":       self._calc_target(price_usd, action),
-            "stop_loss_usd":    self._calc_stop_loss(price_usd, action),
-            "reasons":          self._build_reasons(components, values),
-            "explanation":      self._build_explanation(action, total, confidence),
-            "news":             news_data[:5],
-            # Extras para telegram_bot y pdf_generator
-            "squeeze_state":    values.get("squeeze_state", ""),
-            "sqzm_color":       values.get("sqzm_color", "unknown"),
-            "sqzm_valley":      values.get("sqzm_valley", False),
-            "sqzm_peak":        values.get("sqzm_peak",   False),
-            "adx_value":        values.get("adx") or 0,
-            "rsi_value":        values.get("rsi") or 0,
-            "rsi_tf":           values.get("rsi_tf", ""),
-            "adx_tf":           values.get("adx_tf", ""),
-            "squeeze_tf":       values.get("squeeze_tf", ""),
-        }
-
-    # ── Accion ────────────────────────────────────────────────────────────────
-
-    def _action_from_score(self, score: float) -> str:
-        t = THRESHOLDS
-        if   score >= t["buy_strong"]:  return "COMPRA FUERTE"
-        elif score >= t["buy"]:         return "COMPRA"
-        elif score >= t["buy_weak"]:    return "COMPRA DEBIL"
-        elif score <= t["sell_strong"]: return "VENTA FUERTE"
-        elif score <= t["sell"]:        return "VENTA"
-        elif score <= t["sell_weak"]:   return "VENTA DEBIL"
-        else:                           return "MANTENER"
-
-    # ── Evaluadores ───────────────────────────────────────────────────────────
-
-    def _eval_ma(self, values: dict, _) -> tuple:
-        """Medias Moviles diarias — EMA 10/55 (Trading Latino) + SMA 50/200."""
-        close  = values.get("close")
-        ema10  = values.get("ema_10")
-        ema55  = values.get("ema_55")
-        sma50  = values.get("sma_50")
-        sma200 = values.get("sma_200")
-
-        if not close:
-            return 0, {"signal": "sin datos", "details": ""}
-
-        score = 0
+        score = 0.0
         notes = []
 
-        if ema10 and ema55:
-            if ema10 > ema55:
-                score += 4; notes.append("EMA10 > EMA55 (alcista)")
-            else:
-                score -= 4; notes.append("EMA10 < EMA55 (bajista)")
+        if gap_pct is not None:
+            abs_gap = abs(gap_pct)
+            vel_abs = abs(gap_vel) if gap_vel is not None else 0.0
 
-        if sma200:
-            if close > sma200:
-                score += 2; notes.append("Precio > SMA200")
-            else:
-                score -= 2; notes.append("Precio < SMA200")
+            if gap_pct < 0 and gap_closing:
+                if abs_gap < 0.5:
+                    score = 8.0
+                    notes.append(f"GOLDEN CROSS INMINENTE gap {gap_pct:.2f}% vel {vel_abs:.2f}pp/10d")
+                elif abs_gap < 2.0:
+                    score = 6.0 + (1.0 if vel_abs > 1.0 else 0.0)
+                    notes.append(f"Aproximacion Golden Cross gap {gap_pct:.2f}% vel {vel_abs:.2f}pp/10d")
+                elif abs_gap < 5.0:
+                    score = 4.0 + (1.0 if vel_abs > 1.5 else 0.0)
+                    notes.append(f"EMA50 acercandose a EMA200 (gap {gap_pct:.2f}%)")
+                else:
+                    score = 2.0
+                    notes.append(f"Gap negativo cerrando lentamente (gap {gap_pct:.2f}%)")
 
-        if sma50 and sma200:
-            if sma50 > sma200:
-                score += 2; notes.append("Golden Cross SMA50/200")
-            else:
-                score -= 2; notes.append("Death Cross SMA50/200")
+            elif gap_pct > 0 and gap_closing:
+                if abs_gap < 0.5:
+                    score = -8.0
+                    notes.append(f"DEATH CROSS INMINENTE gap {gap_pct:.2f}% vel {vel_abs:.2f}pp/10d")
+                elif abs_gap < 2.0:
+                    score = -6.0 - (1.0 if vel_abs > 1.0 else 0.0)
+                    notes.append(f"Aproximacion Death Cross gap {gap_pct:.2f}% vel {vel_abs:.2f}pp/10d")
+                elif abs_gap < 5.0:
+                    score = -4.0 - (1.0 if vel_abs > 1.5 else 0.0)
+                    notes.append(f"EMA50 acercandose a EMA200 (gap {gap_pct:.2f}%)")
+                else:
+                    score = -2.0
+                    notes.append(f"Gap positivo cerrando lentamente (gap {gap_pct:.2f}%)")
 
-        signal = "bullish" if score > 0 else "bearish" if score < 0 else "neutral"
+            else:
+                have_gc   = gc is not None
+                have_dc   = dc is not None
+                is_golden = have_gc and (not have_dc or gc <= dc)
+                if is_golden:
+                    if gc <= 20:
+                        score = 3.0
+                        notes.append(f"Golden Cross hace {gc}d confirmado (brecha abriendo)")
+                    elif gc <= 60:
+                        score = 2.0
+                        notes.append(f"Tendencia alcista Golden Cross hace {gc}d")
+                    else:
+                        score = 1.0
+                        notes.append(f"EMA50 > EMA200 establecido gap {gap_pct:.2f}%")
+                elif have_dc:
+                    if dc <= 20:
+                        score = -3.0
+                        notes.append(f"Death Cross hace {dc}d confirmado (brecha abriendo)")
+                    elif dc <= 60:
+                        score = -2.0
+                        notes.append(f"Tendencia bajista Death Cross hace {dc}d")
+                    else:
+                        score = -1.0
+                        notes.append(f"EMA50 < EMA200 establecido gap {gap_pct:.2f}%")
+                else:
+                    score = 1.0 if gap_pct > 0 else -1.0
+                    notes.append(f"Sin cruce registrado gap {gap_pct:.2f}%")
+        else:
+            if ema50 and ema200:
+                score = 1.0 if ema50 > ema200 else -1.0
+                notes.append("EMA50/200 sin historial suficiente")
+            else:
+                notes.append("EMA50/200 sin datos")
+
+        score = max(-8.0, min(8.0, round(score, 1)))
+        signal = "alcista" if score > 0 else "bajista" if score < 0 else "neutral"
+        notes.append(f"({tf})")
         return score, {"signal": signal, "details": " | ".join(notes)}
 
-    def _eval_squeeze_adx(self, values: dict, _) -> tuple:
-        """
-        Squeeze Momentum LazyBear + ADX — SEMANAL.
-        Implementacion de la estrategia de Trading Latino.
+    # =========================================================================
+    # 2. Squeeze LazyBear + ADX - Pico de valle / Pico de montana
+    # =========================================================================
 
-        REGLA CLAVE: si squeeze_state == 'no_squeeze' (activo en tendencia libre
-        sin compresion previa, como QTUM subiendo sin squeeze) -> 0 puntos.
-        Evita contar como senal valida activos que simplemente estan en trend.
-        """
-        sq_state    = values.get("squeeze_state",  "unknown")
-        sqzm_color  = values.get("sqzm_color",     "unknown")
-        sqzm_valley = values.get("sqzm_valley",    False)
-        sqzm_peak   = values.get("sqzm_peak",      False)
-        adx         = values.get("adx")   or 0
-        plus_di     = values.get("plus_di")  or 0
-        minus_di    = values.get("minus_di") or 0
-        tf          = values.get("squeeze_tf", "")
+    def _eval_squeeze_adx(self, values: dict, _: Any) -> tuple:
+        sq_state   = values.get("squeeze_state", "unknown")
+        sqzm_color = values.get("sqzm_color", "unknown")
+        valley_bot = values.get("sqzm_valley_bottom", False)
+        mtn_peak   = values.get("sqzm_mountain_peak", False)
+        adx        = values.get("adx") or 0.0
+        adx_prev   = values.get("adx_prev") or 0.0
+        plus_di    = values.get("plus_di") or 0.0
+        minus_di   = values.get("minus_di") or 0.0
+        di_type    = values.get("di_cross_type", "none")
+        di_bars    = values.get("di_cross_bars")
+        tf         = values.get("squeeze_tf", "")
 
-        score = 0
-        notes = []
-        entry_tag = ""
-
-        # ── BLOQUEO: sin compresion previa valida ─────────────────────────────
         if sq_state == "no_squeeze":
-            return 0, {
-                "signal":  "sin setup",
-                "details": (
-                    "Sin compresion previa valida — activo en tendencia libre, "
-                    "Trading Latino no aplica"
-                ),
+            return 0.0, {
+                "signal": "sin setup",
+                "details": "Tendencia libre sin compresion previa - Trading Latino no aplica",
             }
 
-        # ── Fuerza de tendencia (ADX) ─────────────────────────────────────────
-        if   adx >= 40: adx_score = 3
-        elif adx >= 25: adx_score = 2
-        elif adx >= 20: adx_score = 1
-        else:
-            return 0, {
-                "signal":  "lateral",
-                "details": f"ADX {adx:.1f} < 20 — sin tendencia, esperar ({tf})",
+        if adx < 15:
+            return 0.0, {
+                "signal": "lateral",
+                "details": f"ADX {adx:.1f} - sin tendencia suficiente",
             }
 
-        # ── Direccion de la tendencia (DI+ vs DI-) ────────────────────────────
-        di_diff = plus_di - minus_di
-        di_cross_bearish = (minus_di > plus_di) and ((minus_di - plus_di) > 3)
-        di_cross_bullish = (plus_di  > minus_di) and ((plus_di - minus_di)  > 3)
+        adx_rising = (adx_prev > 0) and (adx > adx_prev)
+        adx_strong = adx >= 25
+        score = 0.0
+        notes = []
 
-        if plus_di > minus_di:
-            trend_dir = 1
-            notes.append(f"DI+ {plus_di:.1f} > DI- {minus_di:.1f} (alcista)")
-        elif minus_di > plus_di:
-            trend_dir = -1
-            notes.append(f"DI- {minus_di:.1f} > DI+ {plus_di:.1f} (bajista)")
-            if di_cross_bearish:
-                notes.append("ATENCION: cruce bajista DI — considerar salida")
-        else:
-            trend_dir = 0
+        if valley_bot:
+            base = 7.0
+            if adx_strong and adx_rising:
+                score = base + 1.0
+                notes.append(f"PICO DE VALLE histograma toca fondo y sube ADX {adx:.1f} subiendo confirma")
+            elif adx_strong:
+                score = base
+                notes.append(f"Pico de valle ADX {adx:.1f} fuerte")
+            else:
+                score = base - 2.0
+                notes.append(f"Pico de valle ADX {adx:.1f} debil senal temprana")
 
-        # ── Histograma Squeeze (LazyBear) ─────────────────────────────────────
-        sqzm_score = 0
+        elif mtn_peak:
+            base = -7.0
+            if adx_strong and adx_rising:
+                score = base - 1.0
+                notes.append(f"PICO DE MONTANA histograma toca techo y cae ADX {adx:.1f} subiendo confirma")
+            elif adx_strong:
+                score = base
+                notes.append(f"Pico de montana ADX {adx:.1f} fuerte")
+            else:
+                score = base + 2.0
+                notes.append(f"Pico de montana ADX {adx:.1f} debil senal temprana")
 
-        if sq_state in ("released", "expanding"):
-            if sqzm_color == "green_strong":
-                sqzm_score = 4
-                notes.append("SQZM histograma verde subiendo")
-            elif sqzm_color == "green_weak":
-                sqzm_score = 2
-                notes.append("SQZM histograma verde debilitando — precaucion")
-            elif sqzm_color == "red_strong":
-                sqzm_score = -4
-                notes.append("SQZM histograma rojo bajando")
-            elif sqzm_color == "red_weak":
-                sqzm_score = -2
-                notes.append("SQZM histograma rojo debilitando")
-
-            if sqzm_valley and sqzm_score > 0:
-                sqzm_score += 1
-                entry_tag = " | ENTRADA VALLE (senal optima Trading Latino)"
-            elif sqzm_peak and sqzm_score < 0:
-                sqzm_score -= 1
-                entry_tag = " | ENTRADA PICO (senal optima Trading Latino)"
-
-            # Penalizacion si DI cruza en contra del histograma
-            if (sqzm_score > 0 and di_cross_bearish) or (sqzm_score < 0 and di_cross_bullish):
-                sqzm_score = round(sqzm_score * 0.4)
-                notes.append("DI cruza contra histograma — senal degradada")
+        elif di_type == "bullish" and di_bars is not None and di_bars <= 4:
+            score = 4.0 if adx_strong else 2.0
+            notes.append(f"Cruce alcista DI+ > DI- hace {di_bars} semanas")
+        elif di_type == "bearish" and di_bars is not None and di_bars <= 4:
+            score = -4.0 if adx_strong else -2.0
+            notes.append(f"Cruce bajista DI- > DI+ hace {di_bars} semanas")
 
         elif sq_state == "compressed":
-            notes.append("SQZM comprimido — acumulando presion, esperando liberacion")
-            sqzm_score = 0
+            score = 1.0 if adx_rising else 0.0
+            notes.append(f"Compresion activa presion acumulando ADX {adx:.1f}")
 
-        # ── Score final ────────────────────────────────────────────────────────
-        if (sqzm_score > 0 and trend_dir >= 0) or (sqzm_score < 0 and trend_dir <= 0):
-            score = (adx_score + abs(sqzm_score)) * trend_dir
         else:
-            score = round((adx_score + abs(sqzm_score)) * trend_dir * 0.2)
-            notes.append("Divergencia DI/histograma")
+            if sqzm_color in ("green_strong", "green_weak") and plus_di > minus_di:
+                score = 1.0
+                notes.append("Impulso alcista establecido (no hay cambio reciente)")
+            elif sqzm_color in ("red_strong", "red_weak") and minus_di > plus_di:
+                score = -1.0
+                notes.append("Impulso bajista establecido (no hay cambio reciente)")
 
-        score = max(-8, min(8, score))
-        notes.append(f"ADX {adx:.1f} ({tf})")
-        if entry_tag:
-            notes.append(entry_tag)
-
+        score = max(-8.0, min(8.0, score))
+        notes.append(f"({tf})")
         signal = (
-            "strong bullish" if score >= 5 else
-            "bullish"        if score >= 2 else
-            "strong bearish" if score <= -5 else
-            "bearish"        if score <= -2 else
+            "cambio alcista" if score >= 6 else
+            "alcista"        if score >= 2 else
+            "cambio bajista" if score <= -6 else
+            "bajista"        if score <= -2 else
             "neutral"
         )
         return score, {"signal": signal, "details": " | ".join(notes)}
 
-    def _eval_rsi(self, values: dict, _) -> tuple:
-        """RSI 14 semanal — filtro y confirmacion."""
-        rsi = values.get("rsi")
-        tf  = values.get("rsi_tf", "")
+    # =========================================================================
+    # 3. RSI - Agotamiento de tendencia
+    # =========================================================================
+
+    def _eval_rsi(self, values: dict, _: Any) -> tuple:
+        rsi      = values.get("rsi")
+        rsi_prev = values.get("rsi_prev")
+        rsi_div  = values.get("rsi_divergence", "none")
+        tf       = values.get("rsi_tf", "")
 
         if rsi is None:
-            return 0, {"signal": "sin datos", "details": ""}
+            return 0.0, {"signal": "sin datos", "details": "RSI no disponible"}
 
-        if   rsi >= 75: score, signal = -4, "sobrecompra extrema — evitar COMPRA"
-        elif rsi >= 70: score, signal =  0, "sobrecompra — precaucion"
-        elif rsi >= 60: score, signal =  3, "zona alcista"
-        elif rsi >= 45: score, signal =  1, "zona neutral-alcista"
-        elif rsi >= 35: score, signal = -1, "zona neutral-bajista"
-        elif rsi >= 30: score, signal =  0, "sobreventa — precaucion"
-        else:           score, signal =  4, "sobreventa extrema — evitar VENTA"
-
-        return score, {"signal": signal, "details": f"RSI {rsi:.1f} ({tf})"}
-
-    def _eval_volume(self, values: dict, _) -> tuple:
-        """Volumen diario — OBV / VWAP / CMF."""
-        obv_s  = values.get("obv_signal",  "neutral")
-        vwap_s = values.get("vwap_signal", "neutral")
-        cmf    = values.get("cmf", 0.0) or 0.0
-        tf     = values.get("vol_tf", "")
-
-        score = 0
+        score = 0.0
         notes = []
 
-        if obv_s == "rising":
-            score += 3; notes.append("OBV alcista")
-        elif obv_s == "falling":
-            score -= 3; notes.append("OBV bajista")
+        if rsi_prev is not None and rsi_prev >= 70 and rsi < rsi_prev:
+            agot = min(8.0, round((rsi_prev - rsi) * 0.6 + 4.0, 1))
+            score = -agot
+            notes.append(f"AGOTAMIENTO ALCISTA RSI {rsi_prev:.1f}->{rsi:.1f} saliendo de sobrecompra")
 
-        if vwap_s == "above":
-            score += 3; notes.append("Precio > VWAP")
-        elif vwap_s == "below":
-            score -= 3; notes.append("Precio < VWAP")
+        elif rsi_prev is not None and rsi_prev <= 30 and rsi > rsi_prev:
+            agot = min(8.0, round((rsi - rsi_prev) * 0.6 + 4.0, 1))
+            score = agot
+            notes.append(f"AGOTAMIENTO BAJISTA RSI {rsi_prev:.1f}->{rsi:.1f} saliendo de sobreventa")
 
-        if cmf > 0.1:
-            score += 2; notes.append(f"CMF {cmf:.2f} (flujo positivo)")
-        elif cmf < -0.1:
-            score -= 2; notes.append(f"CMF {cmf:.2f} (flujo negativo)")
+        elif rsi_div == "bullish":
+            score = 5.0
+            notes.append("Divergencia alcista precio baja RSI sube (agotamiento bajista)")
+        elif rsi_div == "bearish":
+            score = -5.0
+            notes.append("Divergencia bajista precio sube RSI baja (agotamiento alcista)")
 
-        score  = max(-8, min(8, score))
-        signal = "bullish" if score > 2 else "bearish" if score < -2 else "neutral"
-        return score, {"signal": signal, "details": " | ".join(notes) + f" ({tf})"}
+        elif rsi >= 70:
+            score = -2.0
+            notes.append(f"RSI {rsi:.1f} sobrecompra vigilar agotamiento")
+        elif rsi <= 30:
+            score = 2.0
+            notes.append(f"RSI {rsi:.1f} sobreventa vigilar agotamiento")
 
-    def _eval_news(self, _, news_data: list) -> tuple:
-        """Sentimiento de noticias."""
-        if not news_data:
-            return 0, {"signal": "sin noticias", "details": ""}
+        elif rsi_prev is not None:
+            if rsi > 50 and rsi_prev < 50:
+                score = 3.0
+                notes.append(f"RSI cruza sobre 50 ({rsi_prev:.1f}->{rsi:.1f}) momentum alcista")
+            elif rsi < 50 and rsi_prev > 50:
+                score = -3.0
+                notes.append(f"RSI cruza bajo 50 ({rsi_prev:.1f}->{rsi:.1f}) momentum bajista")
+            elif rsi > 50:
+                score = 1.0
+                notes.append(f"RSI {rsi:.1f} sobre 50")
+            else:
+                score = -1.0
+                notes.append(f"RSI {rsi:.1f} bajo 50")
+        else:
+            score = 1.0 if rsi > 50 else -1.0
+            notes.append(f"RSI {rsi:.1f}")
 
-        pos   = sum(1 for n in news_data if n.get("sentiment") == "positive")
-        neg   = sum(1 for n in news_data if n.get("sentiment") == "negative")
-        total = len(news_data)
-
-        if   pos >= neg * 2 and pos >= 2: score = 5
-        elif pos > neg:                   score = 2
-        elif neg >= pos * 2 and neg >= 2: score = -5
-        elif neg > pos:                   score = -2
-        else:                             score = 0
-
-        label = "positivo" if score > 0 else "negativo" if score < 0 else "neutral"
-        return score, {
-            "signal":  label,
-            "details": f"{pos} positivas / {neg} negativas / {total} total",
-        }
-
-    # ── Targets y Stop Loss ───────────────────────────────────────────────────
-
-    def _calc_target(self, price: float, action: str) -> Optional[float]:
-        if not price:
-            return None
-        pct_map = {
-            "COMPRA FUERTE": 0.10, "COMPRA": 0.08, "COMPRA DEBIL": 0.05,
-            "VENTA FUERTE": -0.10, "VENTA": -0.08, "VENTA DEBIL": -0.05,
-        }
-        pct = pct_map.get(action)
-        return round(price * (1 + pct), 2) if pct is not None else None
-
-    def _calc_stop_loss(self, price: float, action: str) -> Optional[float]:
-        if not price:
-            return None
-        pct_map = {
-            "COMPRA FUERTE": -0.05, "COMPRA": -0.06, "COMPRA DEBIL": -0.07,
-            "VENTA FUERTE":   0.05, "VENTA":   0.06, "VENTA DEBIL":   0.07,
-        }
-        pct = pct_map.get(action)
-        return round(price * (1 + pct), 2) if pct is not None else None
-
-    # ── Textos ────────────────────────────────────────────────────────────────
-
-    def _build_reasons(self, components: dict, values: dict) -> list:
-        reasons = []
-        for key, comp in components.items():
-            wsc = comp.get("weighted_score", 0)
-            det = comp.get("details", "") or comp.get("signal", "")
-            if abs(wsc) < 1:
-                continue
-            icon = "[+]" if wsc > 0 else "[-]"
-            reasons.append(f"{icon} {det}")
-        return reasons[:6]
-
-    def _build_explanation(self, action: str, score: float, confidence: dict) -> str:
-        return (
-            f"{action} | Score: {score:+.1f}/40 | "
-            f"Confianza: {confidence['score']}/{confidence['total']} indicadores"
+        score = max(-8.0, min(8.0, score))
+        notes.append(f"({tf})")
+        signal = (
+            "agotamiento alcista" if score <= -4 else
+            "agotamiento bajista" if score >= 4  else
+            "alcista"             if score > 0   else
+            "bajista"             if score < 0   else
+            "neutral"
         )
+        return score, {"signal": signal, "details": " | ".join(notes)}
+
+    # =========================================================================
+    # 4. Volumen - Conviccion y fuerza del cambio de tendencia
+    #
+    # Filosofia: el volumen confirma CONVICCIONES, no tendencias.
+    # Un cambio con volumen alto es real. Con volumen bajo es trampa.
+    #
+    # Señales en orden de prioridad:
+    #   1. OBV divergencia    - acumulacion/distribucion oculta (mas poderosa)
+    #   2. CMF cruce de cero  - flujo de dinero cambia de manos
+    #   3. Ratio U/D          - compradores vs vendedores (ultimos 10 dias)
+    #   4. Spike de volumen   - conviccion detras del movimiento actual
+    # =========================================================================
+
+    def _eval_volume(self, values: dict, _: Any) -> tuple:
+        obv_div   = values.get("obv_divergence", "none")
+        obv_sig   = values.get("obv_signal", "neutral")
+        cmf       = values.get("cmf") or 0.0
+        cmf_prev  = values.get("cmf_prev")
+        vol_ratio = values.get("vol_ratio")
+        vol_ud    = values.get("vol_ud_ratio")
+        tf        = values.get("vol_tf", "")
+
+        score = 0.0
+        notes = []
+
+        # 1. OBV Divergencia - senal mas poderosa de cambio
+        if obv_div == "bullish":
+            score += 4.0
+            notes.append("OBV DIVERGENCIA ALCISTA precio baja OBV sube (acumulacion oculta)")
+        elif obv_div == "bearish":
+            score -= 4.0
+            notes.append("OBV DIVERGENCIA BAJISTA precio sube OBV baja (distribucion oculta)")
+
+        # 2. CMF cruce de cero - flujo cambia de manos
+        if cmf_prev is not None:
+            if cmf > 0 and cmf_prev <= 0:
+                score += 3.0
+                notes.append(f"CMF cruza positivo ({cmf_prev:.2f}->{cmf:.2f}) compradores toman control")
+            elif cmf < 0 and cmf_prev >= 0:
+                score -= 3.0
+                notes.append(f"CMF cruza negativo ({cmf_prev:.2f}->{cmf:.2f}) vendedores toman control")
+            elif cmf > 0.15:
+                score += 1.5
+                notes.append(f"CMF {cmf:.2f} flujo positivo fuerte")
+            elif cmf > 0.05:
+                score += 0.5
+                notes.append(f"CMF {cmf:.2f} flujo positivo leve")
+            elif cmf < -0.15:
+                score -= 1.5
+                notes.append(f"CMF {cmf:.2f} flujo negativo fuerte")
+            elif cmf < -0.05:
+                score -= 0.5
+                notes.append(f"CMF {cmf:.2f} flujo negativo leve")
+            else:
+                notes.append(f"CMF {cmf:.2f} neutro")
+        else:
+            if cmf > 0.1:
+                score += 1.0
+                notes.append(f"CMF {cmf:.2f} positivo")
+            elif cmf < -0.1:
+                score -= 1.0
+                notes.append(f"CMF {cmf:.2f} negativo")
+
+        # 3. Ratio up-day / down-day (acumulacion vs distribucion)
+        if vol_ud is not None:
+            if vol_ud > 2.0:
+                score += 2.0
+                notes.append(f"Ratio U/D {vol_ud:.1f} fuerte acumulacion (compradores dominan)")
+            elif vol_ud > 1.5:
+                score += 1.0
+                notes.append(f"Ratio U/D {vol_ud:.1f} acumulacion moderada")
+            elif vol_ud < 0.5:
+                score -= 2.0
+                notes.append(f"Ratio U/D {vol_ud:.1f} fuerte distribucion (vendedores dominan)")
+            elif vol_ud < 0.7:
+                score -= 1.0
+                notes.append(f"Ratio U/D {vol_ud:.1f} distribucion moderada")
+            else:
+                notes.append(f"Ratio U/D {vol_ud:.1f} equilibrado")
+
+        # 4. Spike de volumen - conviccion detras del movimiento
+        if vol_ratio is not None:
+            if vol_ratio > 2.0:
+                extra = 1.5 if obv_sig == "rising" else -1.5 if obv_sig == "falling" else 0.0
+                score += extra
+                direction = "alcista" if obv_sig == "rising" else "bajista" if obv_sig == "falling" else "sin dir"
+                notes.append(f"Spike {vol_ratio:.1f}x promedio conviccion {direction}")
+            elif vol_ratio > 1.5:
+                notes.append(f"Volumen elevado {vol_ratio:.1f}x promedio")
+            elif vol_ratio < 0.5:
+                score *= 0.7
+                notes.append(f"Volumen seco {vol_ratio:.1f}x promedio senal menos confiable")
+
+        score = max(-8.0, min(8.0, round(score, 2)))
+        notes.append(f"({tf})")
+        signal = (
+            "acumulacion"  if score >= 4 else
+            "alcista"      if score > 0  else
+            "distribucion" if score <= -4 else
+            "bajista"      if score < 0  else
+            "neutral"
+        )
+        return score, {"signal": signal, "details": " | ".join(notes)}
+
+    # =========================================================================
+    # 5. Noticias - Sentimiento geopolitico
+    # =========================================================================
+
+    def _eval_news(self, values: dict, news_items: list) -> tuple:
+        if not news_items:
+            return 0.0, {"signal": "sin noticias", "details": "NewsAPI sin resultados"}
+
+        pos = neg = neu = 0
+        keywords_pos = {
+            "rally", "surge", "gain", "bullish", "record", "growth",
+            "recovery", "breakout", "beat", "strong",
+        }
+        keywords_neg = {
+            "crash", "plunge", "fall", "bearish", "recession", "war",
+            "tariff", "ban", "crisis", "collapse", "decline", "risk",
+        }
+        for item in news_items:
+            text = ((item.get("title") or "") + " " + (item.get("description") or "")).lower()
+            p = sum(1 for w in keywords_pos if w in text)
+            n = sum(1 for w in keywords_neg if w in text)
+            if p > n:   pos += 1
+            elif n > p: neg += 1
+            else:       neu += 1
+
+        total = pos + neg + neu or 1
+        net   = pos - neg
+        score = round(max(-5.0, min(5.0, net / total * 5)), 2)
+        signal = "positivo" if score > 0.5 else "negativo" if score < -0.5 else "neutral"
+        details = f"{pos} positivas / {neg} negativas / {neu} neutrales ({total} articulos)"
+        return score, {"signal": signal, "details": details}
