@@ -128,11 +128,14 @@ class NewsAnalyzer:
                 except Exception:
                     pub = pub_raw[:10]
 
+                url_val = art.get('url', '') or ''
+                if not url_val or not url_val.startswith('http'):
+                    logger.debug("NewsAPI URL no disponible para '%s': %r", title[:50], url_val)
                 processed.append({
                     'title':        title,
                     'source':       art.get('source', {}).get('name', 'Desconocido'),
                     'sentiment':    sentiment,
-                    'url':          art.get('url', ''),
+                    'url':          url_val,
                     'published_at': pub,
                 })
 

@@ -248,8 +248,11 @@ def _fmt_news_summary(recommendations: list) -> str:
             meta = " | ".join(filter(None, [src, pub]))
             meta_txt = f" <i>{meta}</i>" if meta else ""
             lines.append(f"    • <b>{title}</b>{meta_txt}")
-            if url:
+            # Validar URL real (NewsAPI puede retornar "[Removed]" o vacío)
+            if url and url.startswith("http") and "[Removed]" not in url:
                 lines.append(f"      🔗 {url}")
+            else:
+                logger.debug("URL no disponible: %s (raw=%r)", title[:40], url)
 
         lines.append("")
 
