@@ -28,13 +28,24 @@ logger = logging.getLogger("main")
 from config             import Config
 from src.data_loader    import DataLoader
 from src.indicators     import IndicatorCalculator
-from src.scoring        import ScoringEngine
+from src.scoring        import Scorer
 from src.news_analyzer  import NewsAnalyzer
 from src.telegram_bot   import send_weekly_report, send_test_message, send_price_alert
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID",   "")
+
+
+# ── Helpers de precio ────────────────────────────────────────────────────────
+
+def _calc_target(price: float, action: str):
+    pct = {"COMPRA FUERTE": 0.10, "COMPRA": 0.08, "VENTA FUERTE": -0.10, "VENTA": -0.08}.get(action)
+    return price * (1 + pct) if pct and price else None
+
+def _calc_stop_loss(price: float, action: str):
+    pct = {"COMPRA FUERTE": -0.05, "COMPRA": -0.06, "VENTA FUERTE": 0.05, "VENTA": 0.06}.get(action)
+    return price * (1 + pct) if pct and price else None
 
 
 # ── ANÁLISIS SEMANAL ──────────────────────────────────────────────────────────
@@ -45,7 +56,7 @@ async def run_weekly_analysis():
 
     config       = Config()
     loader       = DataLoader(config)
-    scorer       = ScoringEngine()
+    scorer       = Scorer()
     news_a       = NewsAnalyzer(config)
     cop_rate     = loader.get_cop_usd_rate()
     portfolio    = loader.load_portfolio()
@@ -66,20 +77,51 @@ async def run_weekly_analysis():
             ind    = calc.calculate()
             values = calc.get_current(ind)
 
-            news   = news_a.get_news_for_ticker(ticker, days=7)
-            score_data = scorer.calculate_score(values, news)
+            news        = news_a.get_news_for_ticker(ticker, days=7)
+            result      = scorer.score(values, news)
+            score       = result["score"]
+            action      = result["action"]
+            breakdown   = result["breakdown"]
 
-            rec = scorer.generate_recommendation(
-                ticker=ticker,
-                score_data=score_data,
-                values=values,
-                news_data=news,
-                cop_rate=cop_rate,
-            )
-            # Enriquecer con datos del portafolio
-            rec["current_value_cop"] = float(row.get("current_value", 0))
-            rec["pct_portfolio"]     = row.get("pct_of_total_portfolio", "")
-            rec["asset_subtype"]     = row.get("asset_subtype", "")
+            price_usd   = values.get("close") or 0
+            price_cop   = round(price_usd * cop_rate, 0) if price_usd else 0
+            target_usd  = _calc_target(price_usd, action)
+            sl_usd      = _calc_stop_loss(price_usd, action)
+
+            n_active    = sum(1 for c in breakdown.values() if abs(c.get("weighted", 0)) >= 0.5)
+            confidence  = {"score": n_active, "total": len(breakdown)}
+
+            reasons = []
+            for comp in breakdown.values():
+                w      = comp.get("weighted", 0)
+                detail = comp.get("details", "") or comp.get("signal", "")
+                if abs(w) >= 1.0 and detail:
+                    reasons.append(f"{'[+]' if w > 0 else '[-]'} {detail}")
+
+            # score_components con alias weighted_score para compatibilidad con pdf
+            score_components = {
+                k: {**v, "weighted_score": v.get("weighted", 0)}
+                for k, v in breakdown.items()
+            }
+
+            rec = {
+                "ticker":          ticker,
+                "action":          action,
+                "score":           score,
+                "score_components":score_components,
+                "confidence":      confidence,
+                "price_usd":       round(price_usd, 2),
+                "price_cop":       price_cop,
+                "target_usd":      round(target_usd, 2) if target_usd else None,
+                "stop_loss_usd":   round(sl_usd, 2)     if sl_usd     else None,
+                "reasons":         reasons[:5],
+                "news":            news[:5],
+                "squeeze_state":   values.get("squeeze_state", ""),
+                "adx_value":       values.get("adx") or 0,
+                "current_value_cop": float(row.get("current_value", 0)),
+                "pct_portfolio":   row.get("pct_of_total_portfolio", ""),
+                "asset_subtype":   row.get("asset_subtype", ""),
+            }
 
             recommendations.append(rec)
             loader.save_recommendation(ticker, rec)
