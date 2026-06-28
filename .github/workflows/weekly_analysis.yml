@@ -2,8 +2,8 @@ name: Analisis Semanal de Inversiones
 
 on:
   schedule:
-    # Domingo 19:00 hora Bogotá = Lunes 00:00 UTC (UTC-5)
-    - cron: '0 0 * * 1'
+    # Domingo 08:00 hora Bogotá = Domingo 13:00 UTC (UTC-5)
+    - cron: '0 13 * * 0'
   workflow_dispatch:   # Permite ejecución manual desde GitHub
 
 jobs:

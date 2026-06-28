@@ -36,12 +36,17 @@ class Config:
     # ── Trii local tickers → yfinance equivalents ──────────────────
     # Trii lists Colombian depositary receipts; these are the underlying US instruments
     TRII_YFINANCE_MAP = {
-        'IUITCO': 'IYW',    # iShares US Technology ETF
-        'IUFSCO': 'IYF',    # iShares US Financials ETF
-        'IUESCO': 'XLU',    # SPDR Utilities (Essential Services equivalent)
-        'CSPXCO': 'SPY',    # S&P 500
-        'BACCO':  'BAC',    # Bank of America
-        'AAPLCO': 'AAPL',   # Apple Inc.
+        'IUITCO':  'IYW',      # iShares US Technology ETF
+        'IUFSCO':  'IYF',      # iShares US Financials ETF
+        'IUESCO':  'XLU',      # SPDR Utilities (Essential Services equivalent)
+        'CSPXCO':  'SPY',      # S&P 500
+        'BACCO':   'BAC',      # Bank of America
+        'AAPLCO':  'AAPL',     # Apple Inc.
+        # Watchlist — tickers con formato especial
+        'IWVL':    'IWVL.L',   # iShares MSCI World Value — London Stock Exchange
+        'ETH':     'ETH-USD',  # Ethereum
+        'XRPUSDT': 'XRP-USD',  # XRP
+        'XLMUSDT': 'XLM-USD',  # Stellar Lumens
     }
 
     # Fallback COP/USD rate (updated at runtime via yfinance)
@@ -87,10 +92,23 @@ class Config:
         'WTAI':   ['AI stocks', 'machine learning', 'generative AI', 'ChatGPT'],
         'BKCH':   ['blockchain', 'Bitcoin ETF', 'crypto regulation', 'DeFi'],
         'ASML':   ['ASML', 'EUV lithography', 'chip equipment', 'semiconductor'],
-        'IUITCO': ['tech stocks', 'technology sector', 'software', 'cloud'],
-        'IUFSCO': ['financial stocks', 'banks', 'interest rates', 'Fed'],
-        'IUESCO': ['utilities', 'essential services', 'electricity', 'water'],
-        'CSPXCO': ['S&P 500', 'US market', 'stocks', 'Wall Street'],
-        'BACCO':  ['Bank of America', 'banks', 'financial results', 'Fed'],
-        'AAPLCO': ['Apple', 'iPhone', 'AAPL earnings', 'App Store'],
+        'IUITCO':  ['tech stocks', 'technology sector', 'software', 'cloud'],
+        'IUFSCO':  ['financial stocks', 'banks', 'interest rates', 'Fed'],
+        'IUESCO':  ['utilities', 'essential services', 'electricity', 'water'],
+        'CSPXCO':  ['S&P 500', 'US market', 'stocks', 'Wall Street'],
+        'BACCO':   ['Bank of America', 'banks', 'financial results', 'Fed'],
+        'AAPLCO':  ['Apple', 'iPhone', 'AAPL earnings', 'App Store'],
+        # Watchlist
+        'IDU':     ['utilities stocks', 'electricity', 'gas utilities', 'water'],
+        'VDC':     ['consumer staples', 'defensive stocks', 'grocery', 'household'],
+        'VT':      ['global stocks', 'world market', 'total market', 'equity'],
+        'ACWI':    ['global equity', 'world market', 'MSCI ACWI', 'international'],
+        'IWVL':    ['value stocks', 'MSCI World Value', 'dividend value', 'quality'],
+        'IEFA':    ['international stocks', 'EAFE', 'Europe Japan', 'developed markets'],
+        'VEU':     ['international equity', 'ex-US stocks', 'global diversification'],
+        'VYMI':    ['international dividends', 'high yield dividend', 'global income'],
+        'NLR':     ['nuclear energy', 'uranium', 'nuclear power', 'clean energy'],
+        'ETH':     ['Ethereum', 'ETH price', 'smart contracts', 'DeFi', 'crypto'],
+        'XRPUSDT': ['XRP', 'Ripple', 'crypto payments', 'SEC Ripple', 'digital payments'],
+        'XLMUSDT': ['Stellar', 'XLM', 'Stellar Lumens', 'cross-border payments'],
     }
