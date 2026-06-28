@@ -971,17 +971,6 @@ def _make_mantener_page(mantener: list):
             else:
                 cell.set_facecolor("white" if r % 2 == 0 else "#fafafa")
     return fig
-       colLabels=["Ticker", "Score", "Precio", "Squeeze", "SQZM Color", "Sector"],
-            loc="center", bbox=[0.02, 0.10, 0.96, 0.80],
-        )
-        tbl.auto_set_font_size(False); tbl.set_fontsize(8.5)
-        for (r, c), cell in tbl.get_celld().items():
-            cell.set_edgecolor("#dddddd")
-            if r == 0:
-                cell.set_facecolor("#eeeeee"); cell.set_text_props(fontweight="bold")
-            else:
-                cell.set_facecolor("white" if r % 2 == 0 else "#fafafa")
-    return fig
 
 
 
