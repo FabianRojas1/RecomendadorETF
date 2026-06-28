@@ -77,6 +77,14 @@ def generate_report_pdf(
             pdf.savefig(_make_asset_type_chart(recommendations), bbox_inches="tight")
             plt.close("all")
 
+            # Tabla de composición del portafolio
+            pdf.savefig(_make_holdings_table(recommendations, portfolio_total_cop), bbox_inches="tight")
+            plt.close("all")
+
+            # Sugerencia de rebalanceo (perfil agresivo)
+            pdf.savefig(_make_rebalancing_page(recommendations, portfolio_total_cop), bbox_inches="tight")
+            plt.close("all")
+
             # Gráfica distribución por señal
             pdf.savefig(_make_portfolio_chart(recommendations), bbox_inches="tight")
             plt.close("all")
@@ -268,6 +276,292 @@ def _make_asset_type_chart(recs: list):
               "Proyección asume: VENTA FUERTE -100% | VENTA DEBIL -50% | "
               "COMPRA FUERTE +25% | COMPRA DEBIL +10% | MANTENER sin cambio",
               ha="center", va="center", fontsize=7, color="#888888", style="italic")
+    return fig
+
+
+def _make_holdings_table(recs: list, total_cop: float):
+    """
+    Tabla de posiciones propias: ticker, tipo, valor COP y % del portafolio.
+    Solo activos con posición (value > 0), ordenados de mayor a menor peso.
+    """
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.93, 1, 0.07])
+    ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=COLORS["bg_header"], ec="none"))
+    ax_h.text(0.5, 0.6, "Composición del Portafolio",
+              ha="center", va="center", fontsize=14, fontweight="bold", color="white")
+    ax_h.text(0.5, 0.18, f"COP ${total_cop:,.0f} en activos propios",
+              ha="center", va="center", fontsize=9, color="#aaaadd")
+
+    owned = [r for r in recs if (r.get("current_value_cop") or 0) > 0]
+    owned.sort(key=lambda x: -(x.get("current_value_cop") or 0))
+
+    # ── Tabla portafolio propio ───────────────────────────────────────────────
+    ax_p = fig.add_axes([0.01, 0.04, 0.98, 0.87])
+    ax_p.axis("off")
+    ax_p.text(0, 0.99, "Posiciones actuales (ordenadas por peso):", fontsize=10,
+              fontweight="bold", color=COLORS["text_dark"], va="top", transform=ax_p.transAxes)
+
+    tbl_data   = []
+    tbl_colors = []
+    for r in owned:
+        val  = float(r.get("current_value_cop", 0) or 0)
+        pct  = val / total_cop * 100 if total_cop else 0
+        act  = r.get("action", "—")
+        bar  = "█" * int(pct / 2) if pct >= 1 else "▏"
+        tbl_data.append([
+            r.get("ticker", ""),
+            r.get("asset_type", ""),
+            r.get("asset_subtype", ""),
+            f"COP {val:,.0f}",
+            f"{pct:.2f}%",
+            bar,
+        ])
+        rc = COLORS.get(act, "#f5f5f5")
+        tbl_colors.append([rc, "#f0f0f0", "#f0f0f0", "#f5f5f5", "#f5f5f5", "#e8f0ff"])
+
+    if tbl_data:
+        tbl = ax_p.table(
+            cellText=tbl_data,
+            colLabels=["Ticker", "Tipo", "Subtipo", "Valor COP", "% Port.", "Peso visual"],
+            loc="upper center", bbox=[0, 0, 1, 0.97],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(8)
+        tbl.auto_set_column_width(list(range(6)))
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#2d3a5a")
+                cell.set_text_props(fontweight="bold", color="white")
+            elif r <= len(tbl_colors):
+                cell.set_facecolor(tbl_colors[r-1][c])
+                if c == 0:
+                    cell.set_text_props(fontweight="bold", color="white")
+                if c == 5:
+                    cell.set_text_props(color="#3355aa", fontfamily="monospace")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    ax_f = fig.add_axes([0, 0, 1, 0.03])
+    ax_f.axis("off")
+    ax_f.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc="#f0f0f0", ec="none"))
+    ax_f.text(0.5, 0.5,
+              "Color de ticker = señal actual del analisis tecnico",
+              ha="center", va="center", fontsize=7, color="#999999")
+    return fig
+
+
+# ── Perfil agresivo: targets y sugerencias ────────────────────────────────────
+_AGRESIVO_TARGETS = {
+    "Crecimiento":    0.70,
+    "Defensiva":      0.15,
+    "Materias Primas": 0.08,
+    "Sectorial":      0.07,
+}
+
+_REBAL_SUGGESTIONS = [
+    # (ticker, accion, razon, cop_delta_label)
+    ("XLV",   "REDUCIR",  "Defensiva sobrePonderada (19% actual vs ~6% objetivo). Salud tiene presion regulatoria.",          "-~COP 4.4M"),
+    ("BACCO", "VENDER",   "Banco individual con alta correlacion a IUFSCO. Elimina concentracion en financiero.",             "-~COP 974K"),
+    ("SOXX",  "AUMENTAR", "Semiconductores: ciclo AI en expansion. Aumentar exposicion a growth de alta conviccion.",         "+~COP 2.5M"),
+    ("QQQ",   "AUMENTAR", "Nasdaq 100: mejor vehiculo para crecimiento tech puro. Complementa IUITCO y CSPXCO.",              "+~COP 1.5M"),
+    ("URA",   "AUMENTAR", "Nuclear: energia limpia con vientos favorables (politica global). Refuerza Sectorial.",            "+~COP 900K"),
+    ("ETH",   "INICIAR",  "Crypto exposicion moderada (~1%). Alta volatilidad pero retorno asimetrico para perfil agresivo.", "+~COP 330K"),
+]
+
+
+def _make_rebalancing_page(recs: list, total_cop: float):
+    """
+    Sugerencia de rebalanceo para perfil agresivo (arriesgado):
+      - Grafica barras: asignacion actual vs objetivo
+      - Tabla: acciones concretas con razon y COP estimado
+    """
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.93, 1, 0.07])
+    ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc="#2d1a5a", ec="none"))
+    ax_h.text(0.5, 0.62, "Sugerencia de Rebalanceo - Perfil Agresivo",
+              ha="center", va="center", fontsize=13, fontweight="bold", color="white")
+    ax_h.text(0.5, 0.18,
+              "Objetivo: maximizar crecimiento con exposicion controlada a defensivos y materias primas",
+              ha="center", va="center", fontsize=8, color="#ccaaff")
+
+    # ── Calcular asignacion actual por tipo ───────────────────────────────────
+    owned = [r for r in recs if (r.get("current_value_cop") or 0) > 0]
+    type_totals: dict = {}
+    for r in owned:
+        atype = r.get("asset_type", "Otro")
+        # Normalizar Blockchain → Crecimiento para el rebalanceo
+        if atype == "Blockchain":
+            atype = "Crecimiento"
+        val = float(r.get("current_value_cop", 0) or 0)
+        type_totals[atype] = type_totals.get(atype, 0) + val
+
+    # Consolidar tipos menores en su categoría más cercana
+    for extra_type in list(type_totals.keys()):
+        if extra_type not in _AGRESIVO_TARGETS:
+            # Poner en Sectorial si no clasificado
+            type_totals["Sectorial"] = type_totals.get("Sectorial", 0) + type_totals.pop(extra_type)
+
+    total = sum(type_totals.values()) or total_cop or 1
+
+    categories = list(_AGRESIVO_TARGETS.keys())
+    actual_pcts  = [type_totals.get(c, 0) / total * 100 for c in categories]
+    target_pcts  = [_AGRESIVO_TARGETS[c] * 100 for c in categories]
+
+    # ── Grafica barras ───────────────────────────────────────────────────────
+    ax_b = fig.add_axes([0.08, 0.62, 0.88, 0.28])
+    x = np.arange(len(categories))
+    w = 0.35
+    bars_act = ax_b.bar(x - w/2, actual_pcts, w, label="Actual",
+                        color=["#3366cc","#cc3333","#cc8833","#228833"], alpha=0.85, zorder=3)
+    bars_tgt = ax_b.bar(x + w/2, target_pcts, w, label="Objetivo agresivo",
+                        color=["#99bbff","#ffaaaa","#ffcc88","#88dd88"], alpha=0.85,
+                        edgecolor="#555555", linewidth=0.8, zorder=3)
+
+    ax_b.set_xticks(x)
+    ax_b.set_xticklabels(categories, fontsize=9)
+    ax_b.set_ylabel("% del portafolio", fontsize=8)
+    ax_b.set_title("Asignacion Actual vs Objetivo (Perfil Agresivo)", fontsize=10, fontweight="bold", pad=6)
+    ax_b.legend(fontsize=8, loc="upper right")
+    ax_b.set_ylim(0, max(max(actual_pcts), max(target_pcts)) * 1.18)
+    ax_b.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax_b.set_axisbelow(True)
+    ax_b.tick_params(axis="both", labelsize=8)
+
+    # Etiquetas sobre las barras
+    for bar, pct in zip(bars_act, actual_pcts):
+        ax_b.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+                  f"{pct:.1f}%", ha="center", va="bottom", fontsize=7, color="#222222")
+    for bar, pct in zip(bars_tgt, target_pcts):
+        ax_b.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+                  f"{pct:.0f}%", ha="center", va="bottom", fontsize=7, color="#444444")
+
+    # ── Lookup señales tecnicas del analisis semanal ─────────────────────────
+    signals = {}
+    for r in recs:
+        tk     = r.get("ticker", "")
+        action = r.get("action", "")
+        score  = float(r.get("score", 0) or 0)
+        sq     = r.get("squeeze_state", "")
+        adx    = float(r.get("adx_value", 0) or 0)
+        signals[tk] = {"action": action, "score": score, "squeeze": sq, "adx": adx}
+
+    def _entry_assessment(ticker, accion_rebal):
+        """
+        Cruza la sugerencia de rebalanceo con la señal tecnica semanal.
+        Devuelve (etiqueta, color_fondo).
+        """
+        sig = signals.get(ticker)
+        if not sig:
+            return "Sin datos", "#eeeeee"
+        action = sig["action"]
+        score  = sig["score"]
+        sq     = sig["squeeze"]
+        is_buy_rebal  = accion_rebal in ("AUMENTAR", "INICIAR")
+        is_sell_rebal = accion_rebal in ("REDUCIR", "VENDER")
+
+        if is_buy_rebal:
+            if "COMPRA FUERTE" in action:
+                return "ENTRADA IDEAL", "#b8f0b8"      # verde fuerte
+            elif "COMPRA" in action:
+                return "Entrada favorable", "#d8f4d8"  # verde suave
+            elif "MANTENER" in action:
+                if sq == "compressed":
+                    return "Esperar release", "#fff3cc"  # amarillo — squeeze comprimido, esperar
+                return "Sin señal clara", "#f0f0f0"
+            else:  # VENTA
+                return "Señal contraria", "#fdd8c8"    # naranja — tecnico dice vender
+        elif is_sell_rebal:
+            if "VENTA FUERTE" in action:
+                return "MOMENTO OPORTUNO", "#ffa8a8"   # rojo fuerte
+            elif "VENTA" in action:
+                return "Buen momento", "#ffc8b0"       # naranja suave
+            elif "MANTENER" in action:
+                return "Sin urgencia", "#f0f0f0"
+            else:  # COMPRA
+                return "Señal contraria", "#d8f4d8"    # verde — tecnico dice comprar, cuidado vender
+        return "—", "#f5f5f5"
+
+    # ── Tabla de sugerencias ──────────────────────────────────────────────────
+    ax_t = fig.add_axes([0.01, 0.07, 0.98, 0.52])
+    ax_t.axis("off")
+    ax_t.text(0, 0.99, "Acciones sugeridas (con señal tecnica semanal):",
+              fontsize=10, fontweight="bold", color=COLORS["text_dark"],
+              va="top", transform=ax_t.transAxes)
+
+    sug_data   = []
+    sug_colors = []
+    for ticker, accion, razon, cop_delta in _REBAL_SUGGESTIONS:
+        sig         = signals.get(ticker, {})
+        tech_action = sig.get("action", "—")
+        tech_score  = sig.get("score", 0)
+        tech_str    = f"{tech_action} ({tech_score:+.0f})" if tech_action != "—" else "Sin datos"
+        entry_lbl, entry_bg = _entry_assessment(ticker, accion)
+        wrapped = textwrap.fill(razon, width=48)
+        sug_data.append([ticker, accion, wrapped, tech_str, entry_lbl, cop_delta])
+
+        if "VENDER" in accion or "REDUCIR" in accion:
+            base_ticker_col = COLORS["VENTA FUERTE"]
+            base_row_col    = "#fff0ec"
+        else:
+            base_ticker_col = COLORS["COMPRA FUERTE"]
+            base_row_col    = "#f0fff0"
+
+        sug_colors.append([
+            base_ticker_col,  # ticker col
+            base_row_col,     # accion col
+            "#fafafa",        # razon col
+            "#f5f5f5",        # señal tecnica col
+            entry_bg,         # momento col
+            base_row_col,     # COP col
+        ])
+
+    tbl = ax_t.table(
+        cellText=sug_data,
+        colLabels=["Ticker", "Accion", "Razon", "Señal tecnica", "Momento entrada", "COP est."],
+        loc="upper center", bbox=[0, 0, 1, 0.94],
+    )
+    tbl.auto_set_font_size(False); tbl.set_fontsize(7)
+    tbl.auto_set_column_width([0, 1, 2, 3, 4, 5])
+
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_edgecolor("#cccccc")
+        if r == 0:
+            cell.set_facecolor("#2d1a5a")
+            cell.set_text_props(fontweight="bold", color="white", fontsize=7.5)
+        elif r <= len(sug_colors):
+            cell.set_facecolor(sug_colors[r-1][c])
+            if c == 0:
+                cell.set_text_props(fontweight="bold", color="white")
+            if c == 4:
+                cell.set_text_props(fontweight="bold", fontsize=6.5)
+        cell.set_height(cell.get_height() * 1.5)
+
+    # ── Leyenda de momento ─────────────────────────────────────────────────────
+    ax_l = fig.add_axes([0.02, 0.01, 0.96, 0.055])
+    ax_l.axis("off")
+    leyenda = [
+        ("ENTRADA IDEAL / MOMENTO OPORTUNO", "#b8f0b8"),
+        ("Entrada favorable / Buen momento", "#d8f4d8"),
+        ("Esperar release / Sin urgencia",   "#fff3cc"),
+        ("Señal contraria — revisar",        "#fdd8c8"),
+    ]
+    for i, (label, color) in enumerate(leyenda):
+        x0 = i / len(leyenda)
+        ax_l.add_patch(mpatches.FancyBboxPatch((x0 + 0.005, 0.1), 0.23, 0.8,
+                       boxstyle="round,pad=0.02", fc=color, ec="#aaaaaa", linewidth=0.6))
+        ax_l.text(x0 + 0.12, 0.5, label, ha="center", va="center",
+                  fontsize=5.8, color="#333333")
+
     return fig
 
 
@@ -554,22 +848,21 @@ def _make_ticker_page(rec: dict):
 
     # ── Bloque Trading Latino ─────────────────────────────────────────────────
     ax_tl = fig.add_axes([0.02, 0.71, 0.96, 0.11])
-    ax_tl.set_xlim(0, 1); ax_tl.set_ylim(0, 1); ax_tl.axis("off")
+    ax_tl.set_xlim(0, 1); ax_tl.set_ylim(0, 1); ax_tl.a
     ax_tl.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
                     boxstyle="round,pad=0.02", fc="#fffbe6", ec="#e0c040", linewidth=0.8))
-    ax_tl.text(0.5, 0.85, "⚡ Estrategia Trading Latino (semanal)",
+    ax_tl.text(0.5, 0.85, "Estrategia Trading Latino (semanal)",
                ha="center", va="center", fontsize=9.5, fontweight="bold",
                color="#7a6000")
 
-    # Estado del Squeeze
     sq_label  = {"compressed": "COMPRIMIDO (acumulando presion)",
                  "released":   "LIBERADO (energia en movimiento)",
                  "expanding":  "EXPANDIENDO"}.get(sq_state, sq_state.upper())
     hist_label = {
-        "green_strong": "VERDE SUBIENDO  — momentum alcista creciente",
-        "green_weak":   "VERDE DEBILITANDO — momentum alcista perdiendo fuerza",
-        "red_strong":   "ROJO BAJANDO  — momentum bajista creciente",
-        "red_weak":     "ROJO DEBILITANDO  — momentum bajista perdiendo fuerza",
+        "green_strong": "VERDE SUBIENDO  - momentum alcista creciente",
+        "green_weak":   "VERDE DEBILITANDO - momentum alcista perdiendo fuerza",
+        "red_strong":   "ROJO BAJANDO  - momentum bajista creciente",
+        "red_weak":     "ROJO DEBILITANDO  - momentum bajista perdiendo fuerza",
     }.get(sqzm_color, sqzm_color)
 
     entry_tag = ""
@@ -580,10 +873,10 @@ def _make_ticker_page(rec: dict):
     tl_line2 = f"Histograma: {hist_label}{entry_tag}"
     tl_line3 = f"ADX: {adx_v:.1f} {'(tendencia fuerte)' if adx_v >= 25 else '(tendencia debil)'}   |   RSI semanal: {rsi_v:.1f}"
 
-    for y, txt, fs in [(0.62, tl_line1, 8.5), (0.40, tl_line2, 8.5), (0.16, tl_line3, 8.5)]:
-        ax_tl.text(0.02, y, txt, va="center", fontsize=fs, color="#5a4000")
+    for y, txt in [(0.62, tl_line1), (0.40, tl_line2), (0.16, tl_line3)]:
+        ax_tl.text(0.02, y, txt, va="center", fontsize=8.5, color="#5a4000")
 
-    # ── Tabla de indicadores ──────────────────────────────────────────────────
+    # -- Tabla de indicadores -------------------------------------------------
     ax_t = fig.add_axes([0.02, 0.38, 0.96, 0.32])
     ax_t.set_xlim(0, 1); ax_t.set_ylim(0, 1); ax_t.axis("off")
     ax_t.text(0, 0.97, "Desglose de indicadores:", fontsize=9.5,
@@ -601,7 +894,6 @@ def _make_ticker_page(rec: dict):
         row_colors.append([rc, rc, rc, rc])
 
     if rows:
-        # cellColours se aplica manualmente por celda para evitar errores de conteo
         tbl = ax_t.table(
             cellText=rows,
             colLabels=["Indicador", "Pts", "Señal", "Detalle"],
@@ -617,7 +909,7 @@ def _make_ticker_page(rec: dict):
             elif r <= len(row_colors):
                 cell.set_facecolor(row_colors[r - 1][c])
 
-    # ── Razones ───────────────────────────────────────────────────────────────
+    # -- Razones --------------------------------------------------------------
     if reasons:
         ax_r = fig.add_axes([0.02, 0.18, 0.96, 0.19])
         ax_r.set_xlim(0, 1); ax_r.set_ylim(0, 1); ax_r.axis("off")
@@ -629,14 +921,14 @@ def _make_ticker_page(rec: dict):
             ax_r.text(0.02, 0.80 - i * 0.18, reason, fontsize=8.5,
                       color=col, va="center")
 
-    # ── Footer ────────────────────────────────────────────────────────────────
+    # -- Footer ---------------------------------------------------------------
     ax_f = fig.add_axes([0, 0, 1, 0.05])
     ax_f.set_xlim(0, 1); ax_f.set_ylim(0, 1); ax_f.axis("off")
     ax_f.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
                    boxstyle="square,pad=0", fc="#f0f0f0", ec="none"))
     ax_f.text(0.5, 0.5,
               f"Generado {datetime.now().strftime('%d/%m/%Y %H:%M')} | "
-              "No constituye asesoría financiera",
+              "No constituye asesoria financiera",
               ha="center", va="center", fontsize=7, color="#999999")
     return fig
 
@@ -648,7 +940,7 @@ def _make_mantener_page(mantener: list):
 
     ax.add_patch(mpatches.FancyBboxPatch((0, 0.92), 1, 0.08,
                  boxstyle="square,pad=0", fc=COLORS["MANTENER"], ec="none"))
-    ax.text(0.5, 0.96, f"MANTENER — {len(mantener)} activos",
+    ax.text(0.5, 0.96, f"MANTENER - {len(mantener)} activos",
             ha="center", va="center", fontsize=16, fontweight="bold",
             color="white", transform=ax.transAxes)
 
@@ -669,6 +961,17 @@ def _make_mantener_page(mantener: list):
         tbl = ax.table(
             cellText=rows,
             colLabels=["Ticker", "Score", "Precio", "Squeeze", "SQZM Color", "Sector"],
+            loc="center", bbox=[0.02, 0.10, 0.96, 0.80],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(8.5)
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#eeeeee"); cell.set_text_props(fontweight="bold")
+            else:
+                cell.set_facecolor("white" if r % 2 == 0 else "#fafafa")
+    return fig
+       colLabels=["Ticker", "Score", "Precio", "Squeeze", "SQZM Color", "Sector"],
             loc="center", bbox=[0.02, 0.10, 0.96, 0.80],
         )
         tbl.auto_set_font_size(False); tbl.set_fontsize(8.5)
