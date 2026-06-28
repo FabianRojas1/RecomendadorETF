@@ -848,7 +848,7 @@ def _make_ticker_page(rec: dict):
 
     # ── Bloque Trading Latino ─────────────────────────────────────────────────
     ax_tl = fig.add_axes([0.02, 0.71, 0.96, 0.11])
-    ax_tl.set_xlim(0, 1); ax_tl.set_ylim(0, 1); ax_tl.a
+    ax_tl.set_xlim(0, 1); ax_tl.set_ylim(0, 1); ax_tl.axis("off")
     ax_tl.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
                     boxstyle="round,pad=0.02", fc="#fffbe6", ec="#e0c040", linewidth=0.8))
     ax_tl.text(0.5, 0.85, "Estrategia Trading Latino (semanal)",
