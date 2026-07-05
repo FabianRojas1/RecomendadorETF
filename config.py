@@ -115,3 +115,50 @@ class Config:
         'XRPUSDT': ['XRP', 'Ripple', 'crypto payments', 'SEC Ripple', 'digital payments'],
         'XLMUSDT': ['Stellar', 'XLM', 'Stellar Lumens', 'cross-border payments'],
     }
+
+    # ── Nombres completos de activos ──────────────────────────────────────────
+    ASSET_NAMES = {
+        # Posiciones Hapi
+        'PALL':    'Aberdeen Std Physical Palladium ETF',
+        'URA':     'Global X Uranium ETF',
+        'BOTZ':    'Global X Robotics & AI ETF',
+        'QTUM':    'Defiance Quantum ETF',
+        'ITA':     'iShares U.S. Aerospace & Defense ETF',
+        'XLV':     'Health Care Select Sector SPDR',
+        'LIT':     'Global X Lithium & Battery Tech ETF',
+        'WTAI':    'WisdomTree AI and Innovation Fund',
+        'PSCE':    'Invesco S&P SmallCap Energy ETF',
+        'SOXX':    'iShares Semiconductor ETF',
+        'BKCH':    'Global X Blockchain ETF',
+        'GLD':     'SPDR Gold Shares',
+        'QQQ':     'Invesco QQQ Trust (Nasdaq 100)',
+        'ARTY':    'iShares Future AI & Tech ETF',
+        'REMX':    'VanEck Rare Earth/Strategic Metals ETF',
+        'IFRA':    'iShares U.S. Infrastructure ETF',
+        'VWO':     'Vanguard FTSE Emerging Markets ETF',
+        'SPY':     'SPDR S&P 500 ETF Trust',
+        'ASML':    'ASML Holding N.V.',
+        'ICLN':    'iShares Global Clean Energy ETF',
+        # Posiciones Trii
+        'IUITCO':  'iShares U.S. Technology ETF (via Trii)',
+        'IUFSCO':  'iShares U.S. Financials ETF (via Trii)',
+        'IUESCO':  'iShares U.S. Utilities ETF (via Trii)',
+        'CSPXCO':  'iShares Core S&P 500 ETF (via Trii)',
+        'BACCO':   'Bank of America Corporation (via Trii)',
+        'AAPLCO':  'Apple Inc. (via Trii)',
+        # Posiciones Binance
+        'BTC':     'Bitcoin',
+        'ETH':     'Ethereum',
+        # Watchlist
+        'IDU':     'iShares U.S. Utilities ETF',
+        'VDC':     'Vanguard Consumer Staples ETF',
+        'VT':      'Vanguard Total World Stock ETF',
+        'ACWI':    'iShares MSCI ACWI ETF',
+        'IWVL':    'iShares MSCI World Value Factor ETF',
+        'IEFA':    'iShares Core MSCI EAFE ETF',
+        'VEU':     'Vanguard FTSE All-World ex-US ETF',
+        'VYMI':    'Vanguard Intl High Dividend Yield ETF',
+        'NLR':     'VanEck Uranium + Nuclear Energy ETF',
+        'XRPUSDT': 'XRP (Ripple)',
+        'XLMUSDT': 'Stellar Lumens (XLM)',
+    }
