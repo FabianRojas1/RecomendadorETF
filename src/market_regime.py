@@ -251,4 +251,199 @@ def _fetch_fred_macro() -> dict:
     df = _fred("FEDFUNDS")
     if df is not None and len(df) >= 2:
         v = float(df.iloc[-1, 0])
-        p = floa
+        p = float(df.iloc[-2, 0])
+        d = "↑" if v > p + 0.01 else ("↓" if v < p - 0.01 else "↔")
+        s = "BAJISTA" if v > p + 0.01 else ("ALCISTA" if v < p - 0.01 else "NEUTRAL")
+        out["fed_rate"] = {
+            "name": "Tasa FED",
+            "value": f"{v:.2f}%",
+            "prev":  f"{p:.2f}% (mes ant.)",
+            "dir": d, "signal": s,
+            "note": "Pausa activa — vigilar decisiones FOMC",
+        }
+    else:
+        out["fed_rate"] = _nd("Tasa FED")
+
+    # ── Inflación CPI YoY (CPIAUCSL) ─────────────────────────────────────────
+    df = _fred("CPIAUCSL")
+    if df is not None and len(df) >= 14:
+        v0   = float(df.iloc[-1,  0])   # mes actual
+        v1   = float(df.iloc[-2,  0])   # mes anterior
+        v13  = float(df.iloc[-13, 0])   # hace 12 meses
+        v14  = float(df.iloc[-14, 0])   # hace 13 meses
+        yoy     = (v0 / v13 - 1) * 100
+        yoy_prv = (v1 / v14 - 1) * 100
+        d = "↑" if yoy > yoy_prv + 0.05 else ("↓" if yoy < yoy_prv - 0.05 else "↔")
+        s = "BAJISTA" if yoy > 3.5 else ("ALCISTA" if yoy < 2.5 else "NEUTRAL")
+        out["cpi_yoy"] = {
+            "name":  "Inflación CPI",
+            "value": f"{yoy:.1f}% YoY",
+            "prev":  f"~{yoy_prv:.1f}% (mes ant.)",
+            "dir": d, "signal": s,
+            "note": f"Meta FED: 2%  |  {'Sobre umbral 3.5%' if yoy > 3.5 else 'Convergiendo al objetivo'}",
+        }
+    else:
+        out["cpi_yoy"] = _nd("Inflación CPI")
+
+    # ── NFP — Empleo No Agrícola (PAYEMS) ─────────────────────────────────────
+    # PAYEMS está en miles de trabajadores; el diff mensual = variación NFP
+    df = _fred("PAYEMS")
+    if df is not None and len(df) >= 3:
+        changes  = df.diff().dropna()
+        nfp_now  = float(changes.iloc[-1, 0])   # miles de empleos añadidos
+        nfp_prev = float(changes.iloc[-2, 0])
+        d = "↑" if nfp_now > nfp_prev + 10 else ("↓" if nfp_now < nfp_prev - 10 else "↔")
+        s = "BAJISTA" if nfp_now < 100 else ("ALCISTA" if nfp_now > 150 else "NEUTRAL")
+        fmt = lambda x: f"+{x:.0f}K" if x >= 0 else f"{x:.0f}K"
+        out["nfp"] = {
+            "name":  "NFP Empleo",
+            "value": fmt(nfp_now),
+            "prev":  f"{fmt(nfp_prev)} (mes ant.)",
+            "dir": d, "signal": s,
+            "note": "> 150K alcista  |  < 100K bajista (Fed puede cortar)",
+        }
+    else:
+        out["nfp"] = _nd("NFP Empleo")
+
+    # ── PIB EE.UU. (GDP) ──────────────────────────────────────────────────────
+    # GDP en miles de millones $. Tasa anualizada = ((v_now/v_prev)^4 - 1) * 100
+    df = _fred("GDP")
+    if df is not None and len(df) >= 3:
+        v0 = float(df.iloc[-1, 0])
+        v1 = float(df.iloc[-2, 0])
+        v2 = float(df.iloc[-3, 0])
+        gr_now  = ((v0 / v1) ** 4 - 1) * 100
+        gr_prev = ((v1 / v2) ** 4 - 1) * 100
+        d = "↑" if gr_now > gr_prev + 0.15 else ("↓" if gr_now < gr_prev - 0.15 else "↔")
+        s = "ALCISTA" if gr_now > 2.5 else ("BAJISTA" if gr_now < 1.5 else "NEUTRAL")
+        out["gdp"] = {
+            "name":  "PIB EE.UU.",
+            "value": f"{gr_now:+.1f}% anualizado",
+            "prev":  f"{gr_prev:+.1f}% (trim. ant.)",
+            "dir": d, "signal": s,
+            "note": "> 2.5% alcista  |  < 1.5% zona de riesgo",
+        }
+    else:
+        out["gdp"] = _nd("PIB EE.UU.")
+
+    # ── UMich Consumer Sentiment (UMCSENT) ────────────────────────────────────
+    df = _fred("UMCSENT")
+    if df is not None and len(df) >= 2:
+        v = float(df.iloc[-1, 0])
+        p = float(df.iloc[-2, 0])
+        d = "↑" if v > p + 0.5 else ("↓" if v < p - 0.5 else "↔")
+        s = "BAJISTA" if v < 55 else ("ALCISTA" if v > 80 else "NEUTRAL")
+        out["umich"] = {
+            "name":  "UMich Sentiment",
+            "value": f"{v:.1f}",
+            "prev":  f"{p:.1f} (mes ant.)",
+            "dir": d, "signal": s,
+            "note": "< 55 consumidor pesimista  |  > 80 optimista",
+        }
+    else:
+        out["umich"] = _nd("UMich Sentiment")
+
+    # ── Solicitudes de Desempleo Iniciales (ICSA) ─────────────────────────────
+    # ICSA en número de personas (no en miles); dividir para mostrar en K
+    df = _fred("ICSA")
+    if df is not None and len(df) >= 2:
+        v = float(df.iloc[-1, 0])
+        p = float(df.iloc[-2, 0])
+        d = "↑" if v > p * 1.01 else ("↓" if v < p * 0.99 else "↔")
+        s = "BAJISTA" if v > 260_000 else ("ALCISTA" if v < 210_000 else "NEUTRAL")
+        out["initial_claims"] = {
+            "name":  "Solicitudes Desempleo",
+            "value": f"{v/1000:.0f}K",
+            "prev":  f"{p/1000:.0f}K (sem. ant.)",
+            "dir": d, "signal": s,
+            "note": "> 260K señal de debilitamiento laboral",
+        }
+    else:
+        out["initial_claims"] = _nd("Solicitudes Desempleo")
+
+    # ── ISM Manufacturing PMI (NAPM) ──────────────────────────────────────────
+    df = _fred("NAPM")
+    if df is not None and len(df) >= 2:
+        v = float(df.iloc[-1, 0])
+        p = float(df.iloc[-2, 0])
+        d = "↑" if v > p + 0.1 else ("↓" if v < p - 0.1 else "↔")
+        s = "ALCISTA" if v > 50 else "BAJISTA"
+        out["ism_pmi"] = {
+            "name":  "ISM Manufacturing PMI",
+            "value": f"{v:.1f}",
+            "prev":  f"{p:.1f} (mes ant.)",
+            "dir": d, "signal": s,
+            "note": "> 50 expansión manufacturera",
+        }
+    else:
+        # ISM a veces no está disponible en FRED (datos privados)
+        out["ism_pmi"] = _nd("ISM Manufacturing PMI",
+                             note="Datos privados — ver ISM.report/manufacturing")
+
+    logger.info("Indicadores FRED obtenidos: %d/%d",
+                sum(1 for v in out.values() if v.get("value") != "N/D"), len(out))
+    return out
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _s(name, value, signal, bull, desc):
+    """Construye un dict de señal."""
+    return {"name": name, "value": value, "signal": signal, "bull": bull, "desc": desc}
+
+
+def _classify(signals: list, macro_data: dict = None) -> dict:
+    """Clasifica el régimen y genera estrategia."""
+    bull_n = len([s for s in signals if s["bull"] is True])
+    total  = len([s for s in signals if s["bull"] is not None])
+    pct    = bull_n / total if total else 0.5
+
+    if pct >= 0.65:
+        regime = "BULL"
+        strategy = (
+            "GROWTH MODE activo. Condiciones macro favorecen crecimiento. "
+            "Mantener o aumentar SOXX, QQQ, BTC, ETH. "
+            "Reducir defensivos si sobreponderados (XLV > 15%). "
+            "Vigilar próximos datos: FOMC, CPI, NFP."
+        )
+    elif pct <= 0.35:
+        regime = "BEAR"
+        strategy = (
+            "DEFENSIVE MODE recomendado. Señales de cautela activas. "
+            "Reducir SOXX y BTC/ETH (primeros en sufrir en bear). "
+            "Aumentar GLD como cobertura. Reforzar XLV, IFRA. "
+            "No escalar posiciones de riesgo hasta mejora de condiciones."
+        )
+    else:
+        regime = "NEUTRAL"
+        strategy = (
+            "ZONA DE TRANSICIÓN. Señales mixtas — sin claridad de dirección. "
+            "Mantener posiciones actuales sin escalar extremos. "
+            "Esperar confirmación en próximos catalizadores: "
+            "decisión FOMC, CPI, reporte de empleo (NFP)."
+        )
+
+    return {
+        "regime":        regime,
+        "bull_pct":      pct,
+        "bull_count":    bull_n,
+        "total_signals": total,
+        "signals":       signals,
+        "macro_data":    macro_data or {},
+        "strategy":      strategy,
+        "fetch_date":    datetime.now().strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+def _fallback(error: str = "") -> dict:
+    return {
+        "regime":        "NEUTRAL",
+        "bull_pct":      0.5,
+        "bull_count":    0,
+        "total_signals": 0,
+        "signals":       [],
+        "macro_data":    {},
+        "strategy":      "No se pudieron obtener datos macro. Revisar conectividad.",
+        "fetch_date":    datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "error":         error,
+    }
