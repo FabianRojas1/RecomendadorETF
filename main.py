@@ -146,6 +146,7 @@ async def run_weekly_analysis():
 
     portfolio_total = portfolio["current_value"].astype(float).sum()
 
+    logger.info("Enviando reporte a Telegram (chat_id=%s)...", CHAT_ID[:6] + "***" if CHAT_ID else "VACÍO")
     ok = await send_weekly_report(
         recommendations=recommendations,
         portfolio_total_cop=portfolio_total,
@@ -154,7 +155,11 @@ async def run_weekly_analysis():
         chat_id=CHAT_ID,
         regime_data=regime_data,
     )
-    logger.info("Reporte enviado: %s", "OK" if ok else "FALLO")
+    if ok:
+        logger.info("Reporte enviado a Telegram: OK")
+    else:
+        logger.error("FALLO al enviar reporte a Telegram — revisar BOT_TOKEN y CHAT_ID en GitHub Secrets")
+        sys.exit(1)
 
 
 # ── MONITOR DIARIO ────────────────────────────────────────────────────────────

@@ -280,6 +280,14 @@ async def send_weekly_report(
         logger.error("python-telegram-bot not installed")
         return False
 
+    if not bot_token:
+        logger.error("TELEGRAM_BOT_TOKEN está vacío")
+        return False
+    if not chat_id:
+        logger.error("TELEGRAM_CHAT_ID está vacío")
+        return False
+
+    logger.info("Telegram: conectando con bot (token=...%s, chat_id=%s)", bot_token[-6:], chat_id)
     try:
         bot = Bot(token=bot_token)
 
@@ -328,10 +336,10 @@ async def send_weekly_report(
         return True
 
     except TelegramError as e:
-        logger.error("Telegram error en weekly report: %s", e)
+        logger.error("Telegram API error: %s — verificar token y chat_id", e)
         return False
     except Exception as e:
-        logger.exception("Error inesperado en weekly report: %s", e)
+        logger.exception("Error inesperado enviando reporte Telegram: %s", e)
         return False
 
 
