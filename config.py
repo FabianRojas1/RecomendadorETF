@@ -42,8 +42,9 @@ class Config:
         'CSPXCO':  'SPY',      # S&P 500
         'BACCO':   'BAC',      # Bank of America
         'AAPLCO':  'AAPL',     # Apple Inc.
-        # Watchlist — tickers con formato especial
+        # Tickers con formato especial
         'IWVL':    'IWVL.L',   # iShares MSCI World Value — London Stock Exchange
+        'BTC':     'BTC-USD',  # Bitcoin
         'ETH':     'ETH-USD',  # Ethereum
         'XRPUSDT': 'XRP-USD',  # XRP
         'XLMUSDT': 'XLM-USD',  # Stellar Lumens
@@ -108,6 +109,8 @@ class Config:
         'VEU':     ['international equity', 'ex-US stocks', 'global diversification'],
         'VYMI':    ['international dividends', 'high yield dividend', 'global income'],
         'NLR':     ['nuclear energy', 'uranium', 'nuclear power', 'clean energy'],
+        'ICLN':    ['clean energy', 'solar', 'wind energy', 'renewable', 'green energy'],
+        'BTC':     ['Bitcoin', 'BTC price', 'crypto market', 'halving', 'institutional crypto'],
         'ETH':     ['Ethereum', 'ETH price', 'smart contracts', 'DeFi', 'crypto'],
         'XRPUSDT': ['XRP', 'Ripple', 'crypto payments', 'SEC Ripple', 'digital payments'],
         'XLMUSDT': ['Stellar', 'XLM', 'Stellar Lumens', 'cross-border payments'],

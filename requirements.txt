@@ -9,3 +9,4 @@ python-dotenv>=1.0.0
 pytz>=2023.3
 fpdf2>=2.7.0
 matplotlib>=3.7.0
+pandas-datareader>=0.10.0

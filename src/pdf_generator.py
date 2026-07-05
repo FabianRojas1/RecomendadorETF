@@ -47,6 +47,7 @@ def generate_report_pdf(
     portfolio_total_cop: float,
     cop_usd_rate: float,
     output_path: str,
+    regime_data: dict = None,
 ) -> bool:
     """
     Genera el PDF completo del reporte semanal usando matplotlib.
@@ -72,6 +73,14 @@ def generate_report_pdf(
                                     len(compras), len(ventas), len(mantener)),
                         bbox_inches="tight")
             plt.close("all")
+
+            # Análisis de régimen de mercado (bull/bear) — primera página de contenido
+            if regime_data:
+                pdf.savefig(_make_market_regime_page(regime_data), bbox_inches="tight")
+                plt.close("all")
+                # Dashboard completo de indicadores macro (FRED + geopolítico)
+                pdf.savefig(_make_indicators_table_page(regime_data), bbox_inches="tight")
+                plt.close("all")
 
             # Gráfica distribución por tipo de activo (2 pies: actual vs proyectado)
             pdf.savefig(_make_asset_type_chart(recommendations), bbox_inches="tight")
@@ -276,6 +285,407 @@ def _make_asset_type_chart(recs: list):
               "Proyección asume: VENTA FUERTE -100% | VENTA DEBIL -50% | "
               "COMPRA FUERTE +25% | COMPRA DEBIL +10% | MANTENER sin cambio",
               ha="center", va="center", fontsize=7, color="#888888", style="italic")
+    return fig
+
+
+# ── Colores por régimen ───────────────────────────────────────────────────────
+_REGIME_STYLE = {
+    "BULL":    {"bg": "#1a5c1a", "light": "#e8f5e8", "text": "#0d3d0d"},
+    "NEUTRAL": {"bg": "#7a6000", "light": "#fff8e0", "text": "#5a4500"},
+    "BEAR":    {"bg": "#8c0000", "light": "#fde8e8", "text": "#700000"},
+}
+_REGIME_LABEL = {
+    "BULL":    "BULL MARKET — Condiciones favorables para crecimiento",
+    "NEUTRAL": "ZONA DE TRANSICION — Mercado con señales mixtas",
+    "BEAR":    "BEAR MARKET — Señales de cautela activas",
+}
+
+
+def _make_market_regime_page(regime_data: dict):
+    """
+    Página de análisis macroeconómico: régimen de mercado (Bull/Bear/Neutral).
+    Muestra cada indicador con su valor, señal e impacto sobre el portafolio agresivo.
+    """
+    regime   = regime_data.get("regime", "NEUTRAL")
+    bull_pct = regime_data.get("bull_pct", 0.5)
+    bull_n   = regime_data.get("bull_count", 0)
+    total_n  = regime_data.get("total_signals", 0)
+    signals  = regime_data.get("signals", [])
+    strategy = regime_data.get("strategy", "")
+    fetch_dt = regime_data.get("fetch_date", "")
+    error    = regime_data.get("error", "")
+
+    rc = _REGIME_STYLE.get(regime, _REGIME_STYLE["NEUTRAL"])
+
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.91, 1, 0.09])
+    ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=rc["bg"], ec="none"))
+    ax_h.text(0.5, 0.68, _REGIME_LABEL.get(regime, regime),
+              ha="center", va="center", fontsize=13, fontweight="bold", color="white")
+    score_txt = (f"{bull_n}/{total_n} señales alcistas  |  Confianza: {bull_pct*100:.0f}%  |  {fetch_dt}"
+                 if total_n else f"Datos no disponibles  |  {fetch_dt}")
+    ax_h.text(0.5, 0.22, f"Análisis Macroeconómico  |  {score_txt}",
+              ha="center", va="center", fontsize=8, color="white", alpha=0.85)
+
+    # ── Barra de score bull/bear ───────────────────────────────────────────────
+    ax_g = fig.add_axes([0.06, 0.845, 0.88, 0.05])
+    ax_g.axis("off"); ax_g.set_xlim(0, 1); ax_g.set_ylim(0, 1)
+    # Fondo gradiente: rojo → amarillo → verde
+    for i in range(100):
+        xi = i / 100
+        r  = max(0, 1 - xi * 2)
+        g  = min(1, xi * 2)
+        ax_g.add_patch(plt.Rectangle((xi, 0.15), 0.01, 0.7,
+                                     fc=(r, g * 0.7, 0), ec="none", alpha=0.6))
+    # Marcador de posición
+    ax_g.add_patch(plt.Rectangle((bull_pct - 0.015, 0.0), 0.03, 1.0,
+                                 fc="white", ec="#333333", linewidth=1.5))
+    ax_g.text(0.01, 0.5, "BEAR", ha="left",  va="center", fontsize=7, color="#880000", fontweight="bold")
+    ax_g.text(0.99, 0.5, "BULL", ha="right", va="center", fontsize=7, color="#007700", fontweight="bold")
+    ax_g.text(bull_pct, -0.15, f"{bull_pct*100:.0f}%",
+              ha="center", va="top", fontsize=8, fontweight="bold", color=rc["text"])
+
+    # ── Tabla de señales ──────────────────────────────────────────────────────
+    ax_t = fig.add_axes([0.01, 0.33, 0.98, 0.49])
+    ax_t.axis("off")
+    ax_t.text(0, 0.99, "Indicadores macroeconómicos analizados:",
+              fontsize=10, fontweight="bold", color=COLORS["text_dark"],
+              va="top", transform=ax_t.transAxes)
+
+    if error and not signals:
+        ax_t.text(0.5, 0.5, f"Error obteniendo datos: {error[:80]}",
+                  ha="center", va="center", fontsize=9, color="#cc0000",
+                  transform=ax_t.transAxes, style="italic")
+    elif signals:
+        tbl_data   = []
+        tbl_rows   = []   # (bg_color, signal_text_color)
+        for sig in signals:
+            bull = sig.get("bull")
+            icon = "▲ ALCISTA" if bull is True else ("▼ BAJISTA" if bull is False else "— NEUTRAL")
+            desc = textwrap.fill(sig.get("desc", ""), width=58)
+            tbl_data.append([sig.get("name", ""), sig.get("value", ""), icon, desc])
+            if bull is True:
+                tbl_rows.append(("#e0f5e0", "#e8fde8", "#0d7a0d", "#f0fdf0"))
+            elif bull is False:
+                tbl_rows.append(("#fde0e0", "#fde8e8", "#b00000", "#fff5f5"))
+            else:
+                tbl_rows.append(("#f0f0f0", "#f5f5f5", "#555555", "#fafafa"))
+
+        tbl = ax_t.table(
+            cellText=tbl_data,
+            colLabels=["Indicador", "Valor actual", "Señal", "Impacto en portafolio agresivo"],
+            loc="upper center", bbox=[0, 0, 1, 0.94],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(7.5)
+        tbl.auto_set_column_width([0, 1, 2, 3])
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#dddddd")
+            if r == 0:
+                cell.set_facecolor("#1e2d4a")
+                cell.set_text_props(fontweight="bold", color="white", fontsize=8)
+            elif r <= len(tbl_rows):
+                bg0, bg1, sig_col, bg3 = tbl_rows[r - 1]
+                bg_map = [bg0, bg1, bg1, bg3]
+                cell.set_facecolor(bg_map[min(c, 3)])
+                if c == 2:
+                    cell.set_text_props(fontweight="bold", color=sig_col)
+            cell.set_height(cell.get_height() * 1.6)
+
+    # ── Estrategia recomendada ────────────────────────────────────────────────
+    ax_s = fig.add_axes([0.03, 0.08, 0.94, 0.23])
+    ax_s.axis("off")
+    ax_s.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="round,pad=0.04", fc=rc["light"], ec=rc["bg"], linewidth=1.5))
+    ax_s.text(0.5, 0.90, "Estrategia recomendada para portafolio agresivo:",
+              ha="center", va="top", fontsize=9.5, fontweight="bold", color=rc["text"],
+              transform=ax_s.transAxes)
+
+    wrapped_strategy = textwrap.fill(strategy, width=88)
+    ax_s.text(0.5, 0.56, wrapped_strategy,
+              ha="center", va="center", fontsize=8, color=rc["text"],
+              transform=ax_s.transAxes, style="italic")
+
+    actions_map = {
+        "BULL":    "Aumentar exposicion: SOXX, QQQ, BTC, ETH  |  Reducir defensivos si > 15%  |  GLD: minimo",
+        "NEUTRAL": "Mantener posiciones actuales  |  No escalar extremos  |  Vigilar FOMC y CPI",
+        "BEAR":    "Reducir: SOXX, BTC, ETH  |  Aumentar: GLD, XLV  |  Prioridad: preservacion de capital",
+    }
+    ax_s.text(0.5, 0.14, actions_map.get(regime, ""),
+              ha="center", va="center", fontsize=8.5, fontweight="bold",
+              color=rc["text"], transform=ax_s.transAxes)
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    ax_f = fig.add_axes([0, 0, 1, 0.075])
+    ax_f.axis("off")
+    ax_f.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc="#f0f0f8", ec="none"))
+    ax_f.text(0.5, 0.72,
+              "Fuentes: VIX (^VIX) | Bono 10Y (^TNX) | T-Bill (^IRX) | "
+              "Dolar Index (DX-Y.NYB) | SPY — via yfinance",
+              ha="center", va="center", fontsize=6.5, color="#777777")
+    ax_f.text(0.5, 0.26,
+              "Analisis automatizado con datos de mercado. "
+              "No constituye asesoria financiera. Complementar con contexto geopolitico (FOMC, CPI, NFP).",
+              ha="center", va="center", fontsize=6.5, color="#999999", style="italic")
+
+    return fig
+
+
+def _make_indicators_table_page(regime_data: dict):
+    """
+    Página: Dashboard completo de indicadores macroeconómicos.
+
+    Secciones:
+      1. Señales de mercado (yfinance): VIX, 10Y nivel/tendencia, curva, DXY, SPY
+      2. Indicadores macroeconómicos (FRED): Fed, CPI, NFP, GDP, UMich, Claims, ISM
+      3. Contexto geopolítico (cuadros fijos actualizables)
+    """
+    signals    = regime_data.get("signals", [])
+    macro_data = regime_data.get("macro_data", {})
+    fetch_dt   = regime_data.get("fetch_date", "")
+    regime     = regime_data.get("regime", "NEUTRAL")
+
+    fig = plt.figure(figsize=(8.5, 11))
+    fig.patch.set_facecolor("white")
+
+    # ── Encabezado ────────────────────────────────────────────────────────────
+    ax_h = fig.add_axes([0, 0.935, 1, 0.065])
+    ax_h.axis("off")
+    ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                   boxstyle="square,pad=0", fc=COLORS["bg_header"], ec="none"))
+    ax_h.text(0.5, 0.67, "Dashboard de Indicadores Macroeconómicos",
+              ha="center", va="center", fontsize=13, fontweight="bold", color="white")
+    ax_h.text(0.5, 0.20,
+              f"Mapa completo de riesgo  |  Régimen: {regime}  |  {fetch_dt}",
+              ha="center", va="center", fontsize=8, color="#aaaadd")
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+    def _sig_style(signal):
+        if signal == "ALCISTA":
+            return "#0d7a0d", "#e4f7e4"
+        elif signal == "BAJISTA":
+            return "#b00000", "#fde4e4"
+        return "#555555", "#f4f4f4"
+
+    def _dir_color(d):
+        if d == "↑": return "#b00000"
+        if d == "↓": return "#0d7a0d"
+        return "#888888"
+
+    def _section_label(pos, text):
+        ax_l = fig.add_axes(pos)
+        ax_l.axis("off")
+        ax_l.add_patch(mpatches.FancyBboxPatch(
+            (0, 0), 1, 1, boxstyle="square,pad=0",
+            fc="#e8eaf6", ec="#3949ab", linewidth=0.5))
+        ax_l.text(0.012, 0.5, text,
+                  fontsize=7.5, fontweight="bold", color="#1a237e",
+                  va="center", transform=ax_l.transAxes)
+
+    # ── Sección 1: Señales de mercado (yfinance) ──────────────────────────────
+    _section_label([0.01, 0.902, 0.98, 0.026],
+                   "  Señales de mercado financiero — yfinance  (^VIX · ^TNX · ^IRX · DX-Y.NYB · SPY)")
+
+    if signals:
+        mkt_rows, mkt_styles = [], []
+        for sig in signals:
+            bull    = sig.get("bull")
+            sig_txt = "ALCISTA" if bull is True else ("BAJISTA" if bull is False else "NEUTRAL")
+            name    = sig.get("name", "")
+            name_s  = name.split(" (")[0] if " (" in name else name
+            desc    = sig.get("desc", "")
+            desc_s  = (desc[:70] + "…") if len(desc) > 70 else desc
+            mkt_rows.append([name_s, sig.get("value", ""), sig_txt, desc_s])
+            mkt_styles.append(_sig_style(sig_txt))
+
+        ax_m = fig.add_axes([0.01, 0.748, 0.98, 0.152])
+        ax_m.axis("off")
+        tbl = ax_m.table(
+            cellText=mkt_rows,
+            colLabels=["Indicador", "Valor actual", "Señal", "Impacto en portafolio agresivo"],
+            loc="upper center", bbox=[0, 0, 1, 1],
+        )
+        tbl.auto_set_font_size(False); tbl.set_fontsize(7.2)
+        tbl.auto_set_column_width([0, 1, 2, 3])
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#e0e0e0")
+            if r == 0:
+                cell.set_facecolor("#1e2d4a")
+                cell.set_text_props(fontweight="bold", color="white", fontsize=7.5)
+            elif r <= len(mkt_styles):
+                sig_col, row_bg = mkt_styles[r - 1]
+                cell.set_facecolor(row_bg)
+                if c == 2:
+                    cell.set_text_props(fontweight="bold", color=sig_col)
+            cell.set_height(cell.get_height() * 1.3)
+    else:
+        ax_m = fig.add_axes([0.01, 0.748, 0.98, 0.152])
+        ax_m.axis("off")
+        ax_m.text(0.5, 0.5, "Sin datos de mercado (yfinance no disponible)",
+                  ha="center", va="center", fontsize=9, color="#cc0000", style="italic")
+
+    # ── Sección 2: Indicadores macro FRED ────────────────────────────────────
+    _section_label([0.01, 0.718, 0.98, 0.026],
+                   "  Indicadores macroeconómicos — FRED  "
+                   "(FEDFUNDS · CPIAUCSL · PAYEMS · GDP · UMCSENT · ICSA · NAPM)")
+
+    fred_keys = ["fed_rate", "cpi_yoy", "nfp", "gdp", "umich", "initial_claims", "ism_pmi"]
+
+    if macro_data:
+        fred_rows, fred_styles = [], []
+        for key in fred_keys:
+            ind = macro_data.get(key, {})
+            if not ind:
+                continue
+            sig_txt = ind.get("signal", "N/D")
+            d_txt   = ind.get("dir", "—")
+            prev    = ind.get("prev", "—")
+            vs_ant  = f"{d_txt} {prev}" if d_txt not in ("—", "↔") else prev
+            note    = (ind.get("note", ""))[:46]
+            fred_rows.append([
+                ind.get("name", key),
+                ind.get("value", "N/D"),
+                vs_ant,
+                sig_txt,
+                note,
+            ])
+            sc, rb = _sig_style(sig_txt)
+            fred_styles.append((sc, rb, d_txt))
+
+        ax_f2 = fig.add_axes([0.01, 0.530, 0.98, 0.186])
+        ax_f2.axis("off")
+        tbl2 = ax_f2.table(
+            cellText=fred_rows,
+            colLabels=["Indicador", "Valor actual", "vs Anterior", "Señal", "Nota"],
+            loc="upper center", bbox=[0, 0, 1, 1],
+        )
+        tbl2.auto_set_font_size(False); tbl2.set_fontsize(7.2)
+        tbl2.auto_set_column_width([0, 1, 2, 3, 4])
+        for (r, c), cell in tbl2.get_celld().items():
+            cell.set_edgecolor("#e0e0e0")
+            if r == 0:
+                cell.set_facecolor("#1e2d4a")
+                cell.set_text_props(fontweight="bold", color="white", fontsize=7.5)
+            elif r <= len(fred_styles):
+                sig_col, row_bg, d_txt = fred_styles[r - 1]
+                cell.set_facecolor(row_bg)
+                if c == 2:
+                    cell.set_text_props(color=_dir_color(d_txt), fontweight="bold")
+                elif c == 3:
+                    cell.set_text_props(fontweight="bold", color=sig_col)
+            cell.set_height(cell.get_height() * 1.28)
+    else:
+        ax_f2 = fig.add_axes([0.01, 0.530, 0.98, 0.186])
+        ax_f2.axis("off")
+        ax_f2.add_patch(mpatches.FancyBboxPatch(
+            (0.05, 0.15), 0.9, 0.68,
+            boxstyle="round,pad=0.04", fc="#fff8e0", ec="#e8c000", linewidth=1))
+        ax_f2.text(0.5, 0.58,
+                   "Datos FRED no disponibles.",
+                   ha="center", va="center", fontsize=10,
+                   color="#7a6000", fontweight="bold")
+        ax_f2.text(0.5, 0.36,
+                   "Instalar: pip install pandas-datareader>=0.10.0",
+                   ha="center", va="center", fontsize=8.5,
+                   color="#7a6000", style="italic")
+
+    # ── Sección 3: Contexto geopolítico ──────────────────────────────────────
+    _section_label([0.01, 0.500, 0.98, 0.026],
+                   "  Contexto geopolítico y catalizadores — análisis cualitativo")
+
+    ax_geo = fig.add_axes([0.01, 0.095, 0.98, 0.400])
+    ax_geo.axis("off")
+    ax_geo.set_xlim(0, 1); ax_geo.set_ylim(0, 1)
+
+    geo_items = [
+        # (titulo, estado, riesgo, linea1, linea2, bg, border)
+        ("Ucrania — Rusia",
+         "Conflicto activo · Sin escalada mayor reciente",
+         "RIESGO ALTO",
+         "ENERGÍA: petróleo y gas volátil en escaladas militares.",
+         "GLD sube como refugio. VIX sensible a noticias de frente.",
+         "#fff2f2", "#cc4444"),
+        ("Israel — Palestina",
+         "Conflicto activo · Riesgo de escalada regional",
+         "RIESGO MEDIO",
+         "Picos puntuales en VIX y GLD. Irán involucrado → riesgo petróleo.",
+         "Impacto directo limitado al portafolio actual.",
+         "#fffbf0", "#cc8800"),
+        ("Tensiones US — China",
+         "Aranceles 145% activos (Trump 2.0) · Sin acuerdo visible",
+         "RIESGO ALTO",
+         "CRÍTICO para SOXX: restricciones en semiconductores y chips IA.",
+         "VWO e IEFA bajo presión por desaceleración de China. Vigilar TSMC/ASML.",
+         "#fff2f2", "#cc4444"),
+        ("FOMC — Fed Powell",
+         "Pausa activa · Hawkish-neutral · NFP 57K abre ventana de corte",
+         "CATALIZADOR",
+         "Próximo FOMC: mercado vigila señal de corte de tasa.",
+         "CPI 14-jul = dato más importante de julio. NFP débil favorece corte en sept.",
+         "#f0f4ff", "#3344cc"),
+    ]
+
+    positions = [
+        (0.010, 0.515, 0.480, 0.468),  # top-left
+        (0.510, 0.515, 0.480, 0.468),  # top-right
+        (0.010, 0.022, 0.480, 0.468),  # bottom-left
+        (0.510, 0.022, 0.480, 0.468),  # bottom-right
+    ]
+
+    risk_colors = {
+        "RIESGO ALTO":  ("#b00000", "#fde4e4"),
+        "RIESGO MEDIO": ("#7a6000", "#fff3cc"),
+        "CATALIZADOR":  ("#00509e", "#e4f0ff"),
+    }
+
+    for (x, y, w, h), (titulo, estado, riesgo, l1, l2, bg, border) in zip(positions, geo_items):
+        # Card
+        ax_geo.add_patch(mpatches.FancyBboxPatch(
+            (x, y), w, h, boxstyle="round,pad=0.01",
+            fc=bg, ec=border, linewidth=1.2))
+        # Title
+        ax_geo.text(x + 0.012, y + h - 0.04, titulo,
+                    fontsize=8.5, fontweight="bold", color="#1a1a2e",
+                    va="top", ha="left")
+        # Risk badge
+        rc_txt, rc_bg = risk_colors.get(riesgo, ("#555", "#eee"))
+        ax_geo.text(x + w - 0.012, y + h - 0.04, f" {riesgo} ",
+                    fontsize=5.8, fontweight="bold", color=rc_txt,
+                    va="top", ha="right",
+                    bbox=dict(facecolor=rc_bg, edgecolor=rc_txt,
+                              boxstyle="round,pad=0.18", linewidth=0.6))
+        # Status
+        ax_geo.text(x + 0.012, y + h - 0.155, estado,
+                    fontsize=6.8, color="#555555",
+                    va="top", ha="left", style="italic")
+        # Divider
+        ax_geo.plot([x + 0.012, x + w - 0.012], [y + h - 0.225, y + h - 0.225],
+                    color=border, linewidth=0.5, alpha=0.6)
+        # Impact lines
+        ax_geo.text(x + 0.012, y + h - 0.298, l1,
+                    fontsize=7, color="#2a2a2a", va="top", ha="left")
+        ax_geo.text(x + 0.012, y + h - 0.405, l2,
+                    fontsize=7, color="#2a2a2a", va="top", ha="left")
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    ax_ft = fig.add_axes([0, 0, 1, 0.085])
+    ax_ft.axis("off")
+    ax_ft.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1,
+                    boxstyle="square,pad=0", fc="#f0f0f8", ec="none"))
+    ax_ft.text(0.5, 0.72,
+               "Señales de mercado: yfinance (^VIX · ^TNX · ^IRX · DX-Y.NYB · SPY)  |  "
+               "Macro FRED: FEDFUNDS · CPIAUCSL · PAYEMS · GDP · UMCSENT · ICSA · NAPM",
+               ha="center", va="center", fontsize=6.2, color="#777777")
+    ax_ft.text(0.5, 0.26,
+               "Contexto geopolítico: análisis cualitativo — actualizar si hay escalada significativa. "
+               "No constituye asesoría financiera.",
+               ha="center", va="center", fontsize=6.2, color="#999999", style="italic")
+
     return fig
 
 

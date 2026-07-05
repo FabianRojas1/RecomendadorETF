@@ -31,6 +31,7 @@ from src.indicators     import IndicatorCalculator
 from src.scoring        import Scorer
 from src.news_analyzer  import NewsAnalyzer
 from src.telegram_bot   import send_weekly_report, send_test_message, send_price_alert
+from src.market_regime  import analyze_market_regime
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -62,6 +63,12 @@ async def run_weekly_analysis():
     portfolio = loader.load_portfolio()
 
     logger.info("Tasa COP/USD: %.0f | Activos: %d", cop_rate, len(portfolio))
+
+    # Análisis macro de régimen de mercado (bull/bear)
+    logger.info("Analizando régimen de mercado...")
+    regime_data = analyze_market_regime()
+    logger.info("Régimen: %s (%.0f%% señales alcistas)",
+                regime_data["regime"], regime_data["bull_pct"] * 100)
 
     recommendations = []
     for _, row in portfolio.iterrows():
@@ -107,6 +114,7 @@ async def run_weekly_analysis():
 
             rec = {
                 "ticker":           ticker,
+                "asset_name":       config.ASSET_NAMES.get(ticker, ""),
                 "action":           action,
                 "score":            score,
                 "score_components": score_components,
@@ -144,6 +152,7 @@ async def run_weekly_analysis():
         cop_usd_rate=cop_rate,
         bot_token=BOT_TOKEN,
         chat_id=CHAT_ID,
+        regime_data=regime_data,
     )
     logger.info("Reporte enviado: %s", "OK" if ok else "FALLO")
 
