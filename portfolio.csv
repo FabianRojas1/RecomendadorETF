@@ -1,48 +1,52 @@
 ticker,quantity,entry_price,entry_date,broker,currency,current_value,pct_of_total_portfolio,asset_type,asset_subtype
-PALL,8.8269,78386.03,,Hapi,COP,702319.19,2.11%,Materias Primas,Materias Primas
-URA,3.99361,86626.63,,Hapi,COP,645063.96,1.94%,Sectorial,Energia
-BOTZ,7.02123,98544.71,,Hapi,COP,934176.89,2.81%,Crecimiento,Tecnologia
-QTUM,0.52356,323777.41,,Hapi,COP,306998.69,0.92%,Crecimiento,Tecnologia
-ITA,0.2483,682686.35,,Hapi,COP,202036.55,0.61%,Crecimiento,Tecnologia
-XLV,12.45192,500483.63,,Hapi,COP,6443547.6,19.37%,Defensiva,Salud
-LIT,3.85623,133492.28,,Hapi,COP,1080584.2,3.25%,Materias Primas,Materias Primas
-WTAI,1.91555,88494.78,,Hapi,COP,320387.07,0.96%,Crecimiento,Tecnologia
-PSCE,2.37267,144348.89,,Hapi,COP,461189.94,1.39%,Sectorial,Energia
-SOXX,0.58624,636968.66,,Hapi,COP,1328390.33,3.99%,Crecimiento,Tecnologia
-BKCH,1.64002,208834.53,,Hapi,COP,491114.88,1.48%,Crecimiento,Blockchain
-GLD,0.48815,1055945.72,,Hapi,COP,649492.16,1.95%,Materias Primas,Materias Primas
-QQQ,0.96618,2148368.48,,Hapi,COP,2466679.49,7.41%,Crecimiento,Tecnologia
-ARTY,3.17665,112019.58,,Hapi,COP,878409.26,2.64%,Crecimiento,Tecnologia
-REMX,1.73498,184323.76,,Hapi,COP,583415.14,1.75%,Materias Primas,Materias Primas
-IFRA,4.43951,155851.83,,Hapi,COP,964655.35,2.90%,Defensiva,Infraestructura
-VWO,1.95748,174965.73,,Hapi,COP,416665.79,1.25%,Crecimiento,Mercados Emergentes
-SPY,1.58753,1212565.27,,Hapi,COP,4088853.1,12.29%,Crecimiento,Indexado
-ASML,0.06688,2534417.08,,Hapi,COP,446348.56,1.34%,Crecimiento,Tecnologia
+XLV,14.87476,548163.05,,Hapi,COP,8148512,19.37%,Defensiva,Salud
+QQQ,2.23458,2291908.15,,Hapi,COP,5122944,7.41%,Crecimiento,Tecnologia
+SPY,2.91248,2461560.36,,Hapi,COP,7170560,12.29%,Crecimiento,Indexado
+MSFT,1.07541,1643098.28,,Hapi,COP,1767200,5.19%,Crecimiento,Tecnologia
+AMZN,0.73245,852486.06,,Hapi,COP,624448,1.83%,Crecimiento,Tecnologia
+MA,0.6398,1904280.28,,Hapi,COP,1218816,3.58%,Crecimiento,Financiero
+ITA,1.50416,744762.17,,Hapi,COP,1120480,3.29%,Crecimiento,Tecnologia
+BKCH,4.4954,215814.58,,Hapi,COP,969696,2.85%,Crecimiento,Blockchain
+VWO,1.95748,194568.70,,Hapi,COP,380800,1.12%,Crecimiento,Mercados Emergentes
+ETHUSD,0.4727349,8000432.01,,Hapi,COP,3780160,11.09%,Crecimiento,Crypto
+BTCUSD,0.01495142,252624000.00,,Hapi,COP,3776416,11.08%,Crecimiento,Crypto
 IUITCO,21,367500021,,Trii,COP,3675000,11.05%,Crecimiento,Tecnologia
 IUFSCO,21,119700021,,Trii,COP,1197000,3.60%,Defensiva,Financiero
 IUESCO,5,1945005,,Trii,COP,194500,0.58%,Defensiva,Servicios Esenciales
 CSPXCO,1,27947201,,Trii,COP,2794720,8.40%,Crecimiento,Indexado
 BACCO,5,9740005,,Trii,COP,974000,2.93%,Defensiva,Financiero
 AAPLCO,1,10247001,,Trii,COP,1024700,3.08%,Crecimiento,Tecnologia
-IDU,0,0,,Watchlist,USD,0,0%,Defensiva,Utilities
-VDC,0,0,,Watchlist,USD,0,0%,Defensiva,Consumo Basico
-VT,0,0,,Watchlist,USD,0,0%,Crecimiento,Global
-ACWI,0,0,,Watchlist,USD,0,0%,Crecimiento,Global
-IWVL,0,0,,Watchlist,USD,0,0%,Crecimiento,Global Value
-IEFA,0,0,,Watchlist,USD,0,0%,Crecimiento,Internacional
-VEU,0,0,,Watchlist,USD,0,0%,Crecimiento,Internacional
-VYMI,0,0,,Watchlist,USD,0,0%,Defensiva,Dividendos
-ICLN,9.74506,86197,,Hapi,USD,805056,1.91%,Sectorial,Energia Limpia
 BTC,0.02825073,306771589,,Binance,COP,5925300.64,14.07%,Crecimiento,Crypto
 ETH,0.3530093,10387278,,Binance,COP,2099246.30,4.99%,Crecimiento,Crypto
-IDU,0,0,,Watchlist,USD,0,0%,Defensiva,Utilities
-VDC,0,0,,Watchlist,USD,0,0%,Defensiva,Consumo Basico
-VT,0,0,,Watchlist,USD,0,0%,Crecimiento,Global
+PALL,0,0,,Watchlist,USD,0,0%,Materias Primas,Materias Primas
+URA,0,0,,Watchlist,USD,0,0%,Sectorial,Energia
+BOTZ,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+QTUM,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+LIT,0,0,,Watchlist,USD,0,0%,Materias Primas,Materias Primas
+WTAI,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+PSCE,0,0,,Watchlist,USD,0,0%,Sectorial,Energia
+SOXX,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+GLD,0,0,,Watchlist,USD,0,0%,Materias Primas,Materias Primas
+ARTY,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+REMX,0,0,,Watchlist,USD,0,0%,Materias Primas,Materias Primas
+IFRA,0,0,,Watchlist,USD,0,0%,Defensiva,Infraestructura
+ASML,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+ICLN,0,0,,Watchlist,USD,0,0%,Sectorial,Energia Limpia
 ACWI,0,0,,Watchlist,USD,0,0%,Crecimiento,Global
-IWVL,0,0,,Watchlist,USD,0,0%,Crecimiento,Global Value
+BATT,0,0,,Watchlist,USD,0,0%,Crecimiento,Baterias
+BMRN,0,0,,Watchlist,USD,0,0%,Crecimiento,Biotecnologia
+ENPH,0,0,,Watchlist,USD,0,0%,Crecimiento,Energia Renovable
+IDU,0,0,,Watchlist,USD,0,0%,Defensiva,Utilities
 IEFA,0,0,,Watchlist,USD,0,0%,Crecimiento,Internacional
+IWVL,0,0,,Watchlist,USD,0,0%,Crecimiento,Global Value
+JNJ,0,0,,Watchlist,USD,0,0%,Defensiva,Salud
+MCHI,0,0,,Watchlist,USD,0,0%,Crecimiento,China
+NLR,0,0,,Watchlist,USD,0,0%,Crecimiento,Nuclear
+PG,0,0,,Watchlist,USD,0,0%,Defensiva,Consumo Basico
+PYPL,0,0,,Watchlist,USD,0,0%,Crecimiento,Tecnologia
+SDGR,0,0,,Watchlist,USD,0,0%,Crecimiento,Biotecnologia
+VDC,0,0,,Watchlist,USD,0,0%,Defensiva,Consumo Basico
 VEU,0,0,,Watchlist,USD,0,0%,Crecimiento,Internacional
+VT,0,0,,Watchlist,USD,0,0%,Crecimiento,Global
 VYMI,0,0,,Watchlist,USD,0,0%,Defensiva,Dividendos
-NLR,0,0,,Watchlist,USD,0,0%,Sectorial,Nuclear
-XRPUSDT,0,0,,Watchlist,USD,0,0%,Crecimiento,Crypto
 XLMUSDT,0,0,,Watchlist,USD,0,0%,Crecimiento,Crypto
