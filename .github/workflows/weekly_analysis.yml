@@ -11,9 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # Necesario para que el bot pueda guardar el estado de las señales
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repositorio
         uses: actions/checkout@v4
+        with:
+          # Historial completo: el paso final hace commit del estado de señales
+          # y un clon superficial rompe el rebase antes del push.
+          fetch-depth: 0
 
       - name: Configurar Python 3.12
         uses: actions/setup-python@v5
@@ -29,5 +37,21 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           NEWS_API_KEY:       ${{ secrets.NEWS_API_KEY }}
+          GROQ_API_KEY:       ${{ secrets.GROQ_API_KEY }}
           TIMEZONE:           America/Bogota
         run: python main.py --now
+
+      # El contenedor se descarta al terminar, asi que la memoria de cuanto
+      # lleva activa cada señal solo sobrevive si se guarda en el repositorio.
+      - name: Guardar estado de señales
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/estado_senales.json
+          if git diff --staged --quiet; then
+            echo "Sin cambios en el estado de señales."
+          else
+            git commit -m "chore: estado de señales $(date -u +%Y-%m-%d)"
+            git pull --rebase --autostash
+            git push
+          fi

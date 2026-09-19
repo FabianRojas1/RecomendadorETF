@@ -8,7 +8,6 @@ scoring.py - Evaluadores orientados a CAMBIOS de tendencia.
     squeeze_adx      x4.0  Pico de valle / pico de montana + ADX
     rsi              x2.0  Agotamiento alcista/bajista + divergencias
     volume           x2.0  Conviccion detras del cambio
-    news             x1.5  Sentimiento geopolitico
 
   Score final: [-40, +40]
     >= +15  COMPRA FUERTE
@@ -24,12 +23,13 @@ logger = logging.getLogger(__name__)
 
 SCORE_CAP = 40.0
 
+# Las noticias NO puntuan: un titular no debe mover una señal de compra o venta.
+# El contexto cualitativo de noticias vive en ia_sintesis.py y solo informa.
 WEIGHTS = {
     "moving_averages": 2.5,
     "squeeze_adx":     4.0,
     "rsi":             2.0,
     "volume":          2.0,
-    "news":            1.5,
 }
 
 
@@ -41,7 +41,6 @@ class Scorer:
             "squeeze_adx":     self._eval_squeeze_adx,
             "rsi":             self._eval_rsi,
             "volume":          self._eval_volume,
-            "news":            self._eval_news,
         }
         breakdown = {}
         raw_total = 0.0
@@ -422,34 +421,3 @@ class Scorer:
         )
         return score, {"signal": signal, "details": " | ".join(notes)}
 
-    # =========================================================================
-    # 5. Noticias - Sentimiento geopolitico
-    # =========================================================================
-
-    def _eval_news(self, values: dict, news_items: list) -> tuple:
-        if not news_items:
-            return 0.0, {"signal": "sin noticias", "details": "NewsAPI sin resultados"}
-
-        pos = neg = neu = 0
-        keywords_pos = {
-            "rally", "surge", "gain", "bullish", "record", "growth",
-            "recovery", "breakout", "beat", "strong",
-        }
-        keywords_neg = {
-            "crash", "plunge", "fall", "bearish", "recession", "war",
-            "tariff", "ban", "crisis", "collapse", "decline", "risk",
-        }
-        for item in news_items:
-            text = ((item.get("title") or "") + " " + (item.get("description") or "")).lower()
-            p = sum(1 for w in keywords_pos if w in text)
-            n = sum(1 for w in keywords_neg if w in text)
-            if p > n:   pos += 1
-            elif n > p: neg += 1
-            else:       neu += 1
-
-        total = pos + neg + neu or 1
-        net   = pos - neg
-        score = round(max(-5.0, min(5.0, net / total * 5)), 2)
-        signal = "positivo" if score > 0.5 else "negativo" if score < -0.5 else "neutral"
-        details = f"{pos} positivas / {neg} negativas / {neu} neutrales ({total} articulos)"
-        return score, {"signal": signal, "details": details}

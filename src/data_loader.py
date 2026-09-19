@@ -112,7 +112,11 @@ class DataLoader:
         Returns empty DataFrame on failure.
         """
         yf_ticker = self.get_yf_ticker(ticker)
-        dl_period = period if period else f"{self.config.HISTORY_DAYS}d"
+        if period:
+            dl_period = period
+        else:
+            dl_period = getattr(self.config, "HISTORY_PERIOD", None) \
+                        or f"{self.config.HISTORY_DAYS}d"
         try:
             df = yf.download(
                 yf_ticker,

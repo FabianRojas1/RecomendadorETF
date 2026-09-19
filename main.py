@@ -4,7 +4,6 @@ main.py — Punto de entrada del recomendador de inversiones.
 Modos:
   python main.py           → scheduler daemon (uso local)
   python main.py --now     → análisis semanal inmediato (GitHub Actions)
-  python main.py --monitor → monitor de precios diario (GitHub Actions)
   python main.py --test    → prueba de conectividad Telegram
 """
 import argparse
@@ -30,8 +29,13 @@ from src.data_loader    import DataLoader
 from src.indicators     import IndicatorCalculator
 from src.scoring        import Scorer
 from src.news_analyzer  import NewsAnalyzer
-from src.telegram_bot   import send_weekly_report, send_test_message, send_price_alert
+from src.telegram_bot   import send_weekly_report, send_test_message
 from src.market_regime  import analyze_market_regime
+from src              import signals as lp_mp
+from src              import estado_senales
+from src              import calendario
+from src              import ia_sintesis
+from src.regimen_cripto import indicadores_cripto
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -70,11 +74,46 @@ async def run_weekly_analysis():
     logger.info("Régimen: %s (%.0f%% señales alcistas)",
                 regime_data["regime"], regime_data["bull_pct"] * 100)
 
+    # Bloque cripto: indicadores propios, independientes de los de acciones
+    logger.info("Descargando indicadores de cripto...")
+    cripto_ind = indicadores_cripto()
+
+    # Titulares generales para el contexto (no para puntuar: solo contexto)
+    titulares = []
+    for t in ("SPY", "BTC"):
+        try:
+            titulares.extend(news_a.get_news_for_ticker(t, days=7))
+        except Exception as e:
+            logger.debug("Sin titulares para %s: %s", t, e)
+
+    # Síntesis cualitativa: IA si hay proveedor, reglas en Python si no
+    sintesis = ia_sintesis.sintetizar({
+        "acciones": {"bull_pct": regime_data.get("bull_pct"),
+                     "signals":  regime_data.get("signals"),
+                     "macro":    regime_data.get("macro_data")},
+        "cripto":   {"indicadores": {k: v.get("value")
+                                     for k, v in cripto_ind.items()}},
+        "titulares": titulares,
+    })
+    logger.info("Síntesis de régimen: acciones %s / cripto %s (fuente: %s)",
+                sintesis["acciones_usa"]["estado"], sintesis["cripto"]["estado"],
+                sintesis["fuente"])
+
+    # Las fechas del bloque "qué vigilar" salen del calendario oficial, no del modelo
+    regime_data["sintesis"]           = sintesis
+    regime_data["cripto_indicadores"] = cripto_ind
+    regime_data["eventos"]            = calendario.proximos_eventos()
+
+    # Memoria de cuanto lleva activa cada señal (sobrevive entre corridas
+    # porque el workflow hace commit del JSON al terminar).
+    ruta_estado = estado_senales.ruta_por_defecto(config)
+    estado_sen  = estado_senales.cargar(ruta_estado)
+
     recommendations = []
     for _, row in portfolio.iterrows():
         ticker = row["ticker"]
         try:
-            df = loader.download_history(ticker, period="2y")
+            df = loader.download_history(ticker)
 
             if df is None or df.empty or len(df) < 60:
                 logger.warning("%s: datos insuficientes, omitido", ticker)
@@ -86,6 +125,27 @@ async def run_weekly_analysis():
 
             news   = news_a.get_news_for_ticker(ticker, days=7)
             result = scorer.score(values, news)
+
+            # Motor LP/MP (checklists de largo y mediano plazo)
+            tiene_posicion = float(row.get("current_value", 0) or 0) > 0
+            lp_res = lp_mp.evaluar_lp(values)
+            mp_res = lp_mp.evaluar_mp(values)
+
+            # Cuanto lleva activa esta lectura (reinicia si cambia LP o MP)
+            vigencia = estado_senales.actualizar(
+                estado_sen, ticker, f"{lp_res['estado']}|{mp_res['estado']}")
+
+            # Catalizador de la semana que afecta a este activo (informativo,
+            # no puntua): se infiere cruzando NEWS_KEYWORDS con las palabras
+            # clave del catalizador, sin mapeos escritos a mano.
+            catalizador = ia_sintesis.catalizador_para_ticker(
+                sintesis.get("catalizadores"), ticker,
+                row.get("asset_type", ""), config.NEWS_KEYWORDS.get(ticker, []))
+
+            comb = lp_mp.combinar(lp_res, mp_res,
+                                  semanas_en_estado=vigencia["semanas"],
+                                  tiene_posicion=tiene_posicion)
+            senales = {"lp": lp_res, "mp": mp_res, "combinada": comb}
 
             score     = result["score"]
             action    = result["action"]
@@ -131,14 +191,25 @@ async def run_weekly_analysis():
                 "pct_portfolio":    row.get("pct_of_total_portfolio", ""),
                 "asset_type":       row.get("asset_type", "Otro"),
                 "asset_subtype":    row.get("asset_subtype", ""),
+                "lp":               senales["lp"],
+                "mp":               senales["mp"],
+                "combinada":        senales["combinada"],
+                "vigencia":         vigencia,
+                "catalizador":      catalizador,
             }
 
             recommendations.append(rec)
             loader.save_recommendation(ticker, rec)
-            logger.info("%s → %s  (score %.1f)", ticker, rec["action"], rec["score"])
+            logger.info("%s → %s (score %.1f) | LP %s / MP %s → %s",
+                        ticker, rec["action"], rec["score"],
+                        senales["lp"]["estado"], senales["mp"]["estado"],
+                        senales["combinada"]["accion"])
 
         except Exception as e:
             logger.error("Error procesando %s: %s", ticker, e)
+
+    if estado_senales.guardar(estado_sen, ruta_estado):
+        logger.info("Estado de señales guardado (%d activos)", len(estado_sen))
 
     if not recommendations:
         logger.error("Sin recomendaciones generadas. Abortando.")
@@ -161,50 +232,6 @@ async def run_weekly_analysis():
         logger.error("FALLO al enviar reporte a Telegram — revisar BOT_TOKEN y CHAT_ID en GitHub Secrets")
         sys.exit(1)
 
-
-# ── MONITOR DIARIO ────────────────────────────────────────────────────────────
-
-async def run_daily_monitor():
-    """
-    Detecta movimientos de precio > 5% comparando los últimos 2 cierres diarios.
-    """
-    logger.info("=== Monitor diario de precios ===")
-
-    config    = Config()
-    loader    = DataLoader(config)
-    cop_rate  = loader.get_cop_usd_rate()
-    portfolio = loader.load_portfolio()
-    alerts    = 0
-
-    for _, row in portfolio.iterrows():
-        ticker = row["ticker"]
-        try:
-            df = loader.download_history(ticker, period="5d")
-
-            if df is None or len(df) < 2:
-                continue
-
-            prev = float(df["Close"].iloc[-2])
-            curr = float(df["Close"].iloc[-1])
-            pct  = (curr - prev) / prev * 100
-
-            if abs(pct) >= 5.0:
-                logger.info("ALERTA: %s movio %.1f%%", ticker, pct)
-                await send_price_alert(
-                    ticker=ticker,
-                    prev_close=prev,
-                    current_price=curr,
-                    pct_change=pct,
-                    cop_usd_rate=cop_rate,
-                    bot_token=BOT_TOKEN,
-                    chat_id=CHAT_ID,
-                )
-                alerts += 1
-
-        except Exception as e:
-            logger.error("Error monitor %s: %s", ticker, e)
-
-    logger.info("Monitor completo — %d alertas enviadas", alerts)
 
 
 # ── TEST ──────────────────────────────────────────────────────────────────────
@@ -235,14 +262,9 @@ def run_scheduler():
         "cron", day_of_week="sun", hour=19, minute=0,
         id="weekly_analysis", name="Analisis semanal dominical",
     )
-    sched.add_job(
-        lambda: asyncio.run(run_daily_monitor()),
-        "interval", hours=24,
-        id="daily_monitor", name="Monitor diario de precios",
-    )
 
     sched.start()
-    logger.info("Scheduler iniciado. Analisis: domingos 19:00 Bogota | Monitor: cada 24h")
+    logger.info("Scheduler iniciado. Analisis: domingos 19:00 Bogota")
     logger.info("Presiona Ctrl+C para detener.")
 
     try:
@@ -258,7 +280,6 @@ def run_scheduler():
 def main():
     parser = argparse.ArgumentParser(description="Recomendador de Inversiones ETF")
     parser.add_argument("--now",     action="store_true", help="Analisis semanal inmediato")
-    parser.add_argument("--monitor", action="store_true", help="Monitor diario de precios")
     parser.add_argument("--test",    action="store_true", help="Test de conectividad Telegram")
     args = parser.parse_args()
 
@@ -268,8 +289,6 @@ def main():
 
     if args.now:
         asyncio.run(run_weekly_analysis())
-    elif args.monitor:
-        asyncio.run(run_daily_monitor())
     elif args.test:
         asyncio.run(run_test())
     else:

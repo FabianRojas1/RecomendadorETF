@@ -46,7 +46,8 @@ def _is_strong_signal(rec: dict) -> bool:
 def _fmt_strong_summary(recommendations: List[dict], portfolio_total: float, cop_rate: float) -> str:
     """Construye el mensaje corto de señales fuertes."""
     now   = datetime.now(BOGOTA_TZ)
-    fecha = now.strftime("%A %d/%m/%Y %H:%M")
+    _DIAS_ES = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]
+    fecha = f"{_DIAS_ES[now.weekday()]} {now.strftime('%d/%m/%Y %H:%M')}"
 
     strong = [r for r in recommendations if _is_strong_signal(r)]
     compras = sorted([r for r in strong if "COMPRA" in r.get("action","")], key=lambda x: -x.get("score",0))
@@ -342,34 +343,6 @@ async def send_weekly_report(
         logger.exception("Error inesperado enviando reporte Telegram: %s", e)
         return False
 
-
-async def send_price_alert(
-    ticker: str,
-    prev_close: float,
-    current_price: float,
-    pct_change: float,
-    cop_usd_rate: float,
-    bot_token: str,
-    chat_id: str,
-) -> bool:
-    """Envía alerta de movimiento de precio > 5%."""
-    if not TG_OK:
-        return False
-    try:
-        bot  = Bot(token=bot_token)
-        icon = "🚀" if pct_change > 0 else "📉"
-        sign = "+" if pct_change > 0 else ""
-        text = (
-            f"{icon} <b>ALERTA DE PRECIO — {ticker}</b>\n"
-            f"Movimiento: <b>{sign}{pct_change:.1f}%</b>\n"
-            f"Cierre anterior: ${prev_close:.2f}  →  Precio actual: ${current_price:.2f}\n"
-            f"<i>{datetime.now(BOGOTA_TZ).strftime('%d/%m/%Y %H:%M')} (Bogotá)</i>"
-        )
-        await bot.send_message(chat_id=chat_id, text=text, parse_mode=ParseMode.HTML)
-        return True
-    except Exception as e:
-        logger.error("Error enviando alerta %s: %s", ticker, e)
-        return False
 
 
 async def send_test_message(bot_token: str, chat_id: str) -> bool:

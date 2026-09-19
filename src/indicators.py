@@ -23,6 +23,20 @@ SQZM_MULT_KC     = 1.5
 MIN_SQUEEZE_BARS = 3
 SQUEEZE_LOOKBACK = 15
 
+# Colores del squeeze en el vocabulario del checklist del usuario.
+# OJO: el nombre interno NO coincide con la intensidad del color.
+#   green_strong = histograma > 0 y subiendo  -> "verde claro"  (impulso fuerte)
+#   green_weak   = histograma > 0 y bajando   -> "verde oscuro" (alcista corrigiendo)
+#   red_strong   = histograma < 0 y cayendo   -> "rojo claro"   (bajista acelerando)
+#   red_weak     = histograma < 0 y subiendo  -> "rojo oscuro"  (bajista corrigiendo)
+_COLOR_ES = {
+    "green_strong": "verde_claro",
+    "green_weak":   "verde_oscuro",
+    "red_strong":   "rojo_claro",
+    "red_weak":     "rojo_oscuro",
+}
+_DIV_ES = {"bullish": "alcista", "bearish": "bajista", "none": "ninguna"}
+
 
 class IndicatorCalculator:
 
@@ -124,6 +138,17 @@ class IndicatorCalculator:
         ind["vol_ud_ratio"] = self._calc_vol_ud_ratio(close_d, vol_d)
         ind["vol_tf"]       = "daily"
 
+        # ── Marcos semanal y mensual para el motor LP/MP (signals.py) ────────
+        ind.update(self._frame_values(self._resample_ohlcv("W"),  "sem"))
+        ind.update(self._frame_values(self._resample_ohlcv("ME"), "men"))
+
+        # EMA200 mensual: si no hay 200 velas mensuales se usa la EMA200
+        # semanal como referencia de largo plazo, marcandolo como proxy.
+        ind["men_ema200_proxy"] = False
+        if ind.get("men_ema200") is None and ind.get("sem_ema200") is not None:
+            ind["men_ema200"]       = ind["sem_ema200"]
+            ind["men_ema200_proxy"] = True
+
         return ind
 
     def get_current(self, ind: dict) -> dict:
@@ -136,7 +161,7 @@ class IndicatorCalculator:
             except Exception:
                 return default
 
-        return {
+        vals = {
             "close":                    last(ind["close"]),
             "ema_50":                   last(ind["ema_50"]),
             "ema_200":                  last(ind["ema_200"]),
@@ -175,6 +200,10 @@ class IndicatorCalculator:
             "n_daily":                  ind.get("n_daily", 0),
             "n_weekly":                 ind.get("n_weekly", 0),
         }
+        # Marcos LP/MP (prefijos sem_ y men_) que consume signals.py
+        vals.update({k: v for k, v in ind.items()
+                     if k.startswith("sem_") or k.startswith("men_")})
+        return vals
 
     # -------------------------------------------------------------------------
     # Gap EMA50/200 - proximidad al cruce
@@ -380,7 +409,7 @@ class IndicatorCalculator:
                 if not had_valid_squeeze:
                     state = "no_squeeze"
                 else:
-                    sq_release     = squeeze_off & squeeze_on.shift(1).fillna(False)
+                    sq_release     = squeeze_off & squeeze_on.shift(1, fill_value=False)
                     recent_release = (
                         sq_release.dropna().iloc[-6:].any()
                         if len(sq_release.dropna()) >= 6
@@ -535,3 +564,137 @@ class IndicatorCalculator:
             return r if r is not None else pd.Series([0.0] * len(close), index=close.index)
         except Exception:
             return pd.Series([0.0] * len(close), index=close.index)
+
+    # =========================================================================
+    # Marcos semanal y mensual para el motor LP/MP (signals.py)
+    # =========================================================================
+
+    def _resample_ohlcv(self, rule: str) -> pd.DataFrame:
+        """
+        Resamplea a la regla indicada y descarta la ultima vela si aun no ha
+        cerrado: el checklist decide solo sobre cierres de vela.
+        """
+        agg = {"Open": "first", "High": "max", "Low": "min",
+               "Close": "last", "Volume": "sum"}
+        try:
+            frame = self.df.resample(rule).agg(agg).dropna()
+        except ValueError:
+            # pandas < 2.2 no reconoce "ME"
+            frame = self.df.resample(rule.replace("ME", "M")).agg(agg).dropna()
+
+        if frame.empty:
+            return frame
+        try:
+            if pd.Timestamp(frame.index[-1]).date() > pd.Timestamp.today().date():
+                frame = frame.iloc[:-1]
+        except Exception:
+            pass
+        return frame
+
+    @staticmethod
+    def _ultimo(series, default=None):
+        try:
+            if series is None:
+                return default
+            s = series.dropna()
+            return float(s.iloc[-1]) if not s.empty else default
+        except Exception:
+            return default
+
+    def _ema_last(self, series, length):
+        """Ultimo valor de la EMA, o None si no hay velas suficientes."""
+        try:
+            if series is None or len(series.dropna()) < length:
+                return None
+            return self._ultimo(ta.ema(series, length=length))
+        except Exception:
+            return None
+
+    def _frame_values(self, frame: pd.DataFrame, p: str) -> dict:
+        """Calcula el set de indicadores del checklist sobre un marco temporal."""
+        if frame is None or frame.empty:
+            return {f"{p}_barras": 0}
+
+        close, high, low, vol = (frame["Close"], frame["High"],
+                                 frame["Low"], frame["Volume"])
+        n = len(frame)
+        v = {f"{p}_barras": n, f"{p}_close": self._ultimo(close)}
+
+        # EMAs 10 / 55 / 200
+        v[f"{p}_ema10"]  = self._ema_last(close, 10)
+        v[f"{p}_ema55"]  = self._ema_last(close, 55)
+        v[f"{p}_ema200"] = self._ema_last(close, 200)
+
+        # Pendiente de la EMA55 (cambio en las ultimas 3 velas cerradas)
+        v[f"{p}_ema55_pendiente"] = None
+        try:
+            if n >= 58:
+                e55 = ta.ema(close, length=55).dropna()
+                if len(e55) >= 4:
+                    v[f"{p}_ema55_pendiente"] = round(float(e55.iloc[-1] - e55.iloc[-4]), 4)
+        except Exception:
+            pass
+
+        # ATR 14
+        try:
+            v[f"{p}_atr"] = self._ultimo(ta.atr(high, low, close, length=14)) if n >= 15 else None
+        except Exception:
+            v[f"{p}_atr"] = None
+
+        # RSI 14 + divergencia (apoyo, no determinante)
+        try:
+            if n >= 15:
+                rsi_s = ta.rsi(close, length=14)
+                v[f"{p}_rsi"] = self._ultimo(rsi_s)
+                v[f"{p}_rsi_divergencia"] = _DIV_ES.get(
+                    self._detect_rsi_divergence(close, rsi_s), "ninguna")
+            else:
+                v[f"{p}_rsi"], v[f"{p}_rsi_divergencia"] = None, "ninguna"
+        except Exception:
+            v[f"{p}_rsi"], v[f"{p}_rsi_divergencia"] = None, "ninguna"
+
+        # ADX / DI
+        try:
+            adx_data = self._calc_adx_extended(high, low, close) if n >= 30 else {}
+            v[f"{p}_adx"]      = self._ultimo(adx_data.get("adx"))
+            v[f"{p}_plus_di"]  = self._ultimo(adx_data.get("plus_di"))
+            v[f"{p}_minus_di"] = self._ultimo(adx_data.get("minus_di"))
+        except Exception:
+            v[f"{p}_adx"] = v[f"{p}_plus_di"] = v[f"{p}_minus_di"] = None
+
+        # Squeeze con los colores del checklist
+        try:
+            sq = self._calc_squeeze_lazybear(high, low, close) if n >= SQZM_LENGTH + 5 else {}
+            v[f"{p}_sqz_estado"]     = sq.get("squeeze_state", "unknown")
+            v[f"{p}_sqz_color"]      = _COLOR_ES.get(sq.get("sqzm_color"), "desconocido")
+            v[f"{p}_sqz_color_prev"] = _COLOR_ES.get(sq.get("sqzm_prev_color"), "desconocido")
+        except Exception:
+            v[f"{p}_sqz_estado"] = "unknown"
+            v[f"{p}_sqz_color"] = v[f"{p}_sqz_color_prev"] = "desconocido"
+
+        # OBV: posicion respecto a su EMA20, divergencia y minimos nuevos
+        try:
+            obv = ta.obv(close, vol)
+            serie = obv.dropna()
+            v[f"{p}_obv_divergencia"] = _DIV_ES.get(
+                self._detect_obv_divergence(close, obv), "ninguna")
+            if len(serie) >= 20:
+                o  = self._ultimo(obv)
+                oe = self._ultimo(ta.ema(obv, length=20))
+                v[f"{p}_obv_sobre_ema20"] = (o > oe) if (o is not None and oe is not None) else None
+            else:
+                v[f"{p}_obv_sobre_ema20"] = None
+            v[f"{p}_obv_min_nuevo"] = (bool(serie.iloc[-1] <= serie.iloc[-12:].min())
+                                       if len(serie) >= 12 else None)
+        except Exception:
+            v[f"{p}_obv_sobre_ema20"] = None
+            v[f"{p}_obv_divergencia"] = "ninguna"
+            v[f"{p}_obv_min_nuevo"]   = None
+
+        # Minimo de las ultimas 12 velas (soporte de referencia)
+        try:
+            v[f"{p}_min_12"] = float(low.iloc[-12:].min()) if n >= 12 else float(low.min())
+        except Exception:
+            v[f"{p}_min_12"] = None
+
+        return v

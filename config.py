@@ -23,15 +23,16 @@ class Config:
     PORTFOLIO_CSV = os.path.join(BASE_DIR, 'portfolio.csv')
     OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
 
-    # ── Alert thresholds ───────────────────────────────────────────
-    PRICE_ALERT_THRESHOLD = 5.0   # % change triggers immediate alert
-
     # ── Analysis settings ──────────────────────────────────────────
-    HISTORY_DAYS = 250            # Days of history to download (SMA200 needs 200+)
+    # Historial de precios. El motor LP trabaja en marco MENSUAL:
+    # EMA55 mensual necesita ~5 anos y EMA200 mensual ~17 anos de historia,
+    # por eso se baja todo el historial disponible ("max"). Cuesta lo mismo:
+    # una sola peticion por ticker. HISTORY_DAYS queda como respaldo.
+    HISTORY_PERIOD = 'max'
+    HISTORY_DAYS = 250            # Respaldo si HISTORY_PERIOD no esta definido
     WEEKLY_ANALYSIS_DAY = 'sun'
     WEEKLY_ANALYSIS_HOUR = 19
     WEEKLY_ANALYSIS_MINUTE = 0
-    MONITOR_INTERVAL_HOURS = 24
 
     # ── Trii local tickers → yfinance equivalents ──────────────────
     # Trii lists Colombian depositary receipts; these are the underlying US instruments
@@ -44,6 +45,7 @@ class Config:
         'AAPLCO':  'AAPL',     # Apple Inc.
         # Tickers con formato especial
         'IWVL':    'IWVL.L',   # iShares MSCI World Value — London Stock Exchange
+        'IWVLCO':  'IWVL.L',   # iShares MSCI World Value (CDI Trii)
         'BTC':     'BTC-USD',  # Bitcoin
         'ETH':     'ETH-USD',  # Ethereum
         'XRPUSDT': 'XRP-USD',  # XRP
@@ -105,6 +107,7 @@ class Config:
         'VT':      ['global stocks', 'world market', 'total market', 'equity'],
         'ACWI':    ['global equity', 'world market', 'MSCI ACWI', 'international'],
         'IWVL':    ['value stocks', 'MSCI World Value', 'dividend value', 'quality'],
+        'IWVLCO':  ['value stocks', 'MSCI World Value', 'dividend value', 'quality'],
         'IEFA':    ['international stocks', 'EAFE', 'Europe Japan', 'developed markets'],
         'VEU':     ['international equity', 'ex-US stocks', 'global diversification'],
         'VYMI':    ['international dividends', 'high yield dividend', 'global income'],
@@ -155,6 +158,7 @@ class Config:
         'VT':      'Vanguard Total World Stock ETF',
         'ACWI':    'iShares MSCI ACWI ETF',
         'IWVL':    'iShares MSCI World Value Factor ETF',
+        'IWVLCO':  'iShares MSCI World Value Factor ETF',
         'IEFA':    'iShares Core MSCI EAFE ETF',
         'VEU':     'Vanguard FTSE All-World ex-US ETF',
         'VYMI':    'Vanguard Intl High Dividend Yield ETF',
