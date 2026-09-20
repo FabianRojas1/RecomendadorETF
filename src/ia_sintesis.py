@@ -25,7 +25,20 @@ logger = logging.getLogger(__name__)
 
 PROVEEDOR   = os.getenv("LLM_PROVEEDOR", "groq")
 GROQ_URL    = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODELO = os.getenv("LLM_MODELO", "llama-3.3-70b-versatile")
+
+# Lista de modelos en orden de preferencia. Groq retira y renombra modelos sin
+# avisar, y el catalogo depende del plan de la cuenta: si el primero responde
+# 404 model_not_found se intenta el siguiente, y el reporte sale con IA igual.
+# LLM_MODELO acepta un nombre o varios separados por coma y reemplaza la lista.
+GROQ_MODELOS = [m.strip() for m in os.getenv(
+    "LLM_MODELO",
+    "llama3-70b-8192,"
+    "llama-3.3-70b-versatile,"
+    "llama-3.1-8b-instant,"
+    "openai/gpt-oss-20b"
+).split(",") if m.strip()]
+
+GROQ_MODELO_USADO = None        # lo fija _llamar_groq con el que si respondio
 TIMEOUT_S   = 30
 
 ESTADOS = ("BULL", "BEAR", "RANGO")
@@ -63,7 +76,8 @@ def sintetizar(contexto: dict) -> dict:
                 datos = _validar(cruda, contexto)
                 if datos:
                     datos["fuente"] = "groq"
-                    logger.info("Sintesis generada por IA (%s)", GROQ_MODELO)
+                    datos["modelo"] = GROQ_MODELO_USADO
+                    logger.info("Sintesis generada por IA (%s)", GROQ_MODELO_USADO)
                     return datos
             logger.warning("La IA no devolvio una sintesis utilizable: se usa el respaldo.")
         else:
@@ -81,31 +95,59 @@ def sintetizar(contexto: dict) -> dict:
 # =============================================================================
 
 def _llamar_groq(prompt: str) -> dict:
+    """Intenta los modelos de GROQ_MODELOS en orden hasta que uno responda."""
+    global GROQ_MODELO_USADO
     import requests
 
-    r = requests.post(
-        GROQ_URL,
-        headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-                 "Content-Type": "application/json"},
-        json={
-            "model": GROQ_MODELO,
-            "messages": [
-                {"role": "system",
-                 "content": "Eres un analista macro. Respondes SOLO con JSON valido, "
-                            "en español, sin texto adicional."},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.3,
-            "max_tokens": 2000,
-            "response_format": {"type": "json_object"},
-        },
-        timeout=TIMEOUT_S,
-    )
-    if r.status_code != 200:
-        logger.warning("Groq respondio %s: %s", r.status_code, r.text[:200])
+    cabeceras = {"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                 "Content-Type": "application/json"}
+
+    for modelo in GROQ_MODELOS:
+        r = requests.post(
+            GROQ_URL,
+            headers=cabeceras,
+            json={
+                "model": modelo,
+                "messages": [
+                    {"role": "system",
+                     "content": "Eres un analista macro. Respondes SOLO con JSON valido, "
+                                "en español, sin texto adicional."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 2000,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=TIMEOUT_S,
+        )
+
+        if r.status_code == 200:
+            GROQ_MODELO_USADO = modelo
+            texto = r.json()["choices"][0]["message"]["content"]
+            return _extraer_json(texto)
+
+        detalle = r.text[:200]
+        if _modelo_no_disponible(r.status_code, detalle):
+            logger.warning("Modelo %s no disponible en esta cuenta: se prueba el siguiente.",
+                           modelo)
+            continue
+
+        # 401 (key mala), 429 (cuota) o 5xx: cambiar de modelo no arregla nada.
+        logger.warning("Groq respondio %s con %s: %s", r.status_code, modelo, detalle)
         return {}
-    texto = r.json()["choices"][0]["message"]["content"]
-    return _extraer_json(texto)
+
+    logger.warning("Ningun modelo de la lista esta disponible: %s",
+                   ", ".join(GROQ_MODELOS))
+    return {}
+
+
+def _modelo_no_disponible(status: int, detalle: str) -> bool:
+    """True si el error es 'este modelo no existe / no lo tienes', no otra falla."""
+    if status not in (400, 404):
+        return False
+    d = (detalle or "").lower()
+    return ("model_not_found" in d or "does not exist" in d
+            or "decommissioned" in d or "has been deprecated" in d)
 
 
 def _extraer_json(texto: str) -> dict:
