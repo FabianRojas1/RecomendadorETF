@@ -156,6 +156,59 @@ def _classify_sentiment(title: str, description: str) -> str:
     return "neutral"
 
 
+def _fmt_catalizadores_summary(regime_data: dict) -> str:
+    """
+    Resumen de catalizadores geopolíticos y de materias primas de la semana.
+    
+    Args:
+        regime_data: Dict con {sintesis: {catalizadores: [...]}}
+    
+    Returns:
+        Texto formateado para Telegram o cadena vacía si no hay catalizadores.
+    """
+    catalizadores = ((regime_data.get("sintesis") or {}).get("catalizadores") or [])[:4]
+    
+    if not catalizadores:
+        return ""
+    
+    lines = ["🌍 <b>CATALIZADORES DE LA SEMANA</b>\n"]
+    
+    # Colores/emojis por riesgo
+    RIESGO_EMOJI = {
+        'alto': '🔴 <b>RIESGO ALTO</b>',
+        'medio': '🟡 <b>RIESGO MEDIO</b>',
+        'bajo': '🟢 <b>RIESGO BAJO</b>',
+    }
+    
+    for cat in catalizadores:
+        riesgo = cat.get('riesgo', 'medio').lower()
+        emoji = RIESGO_EMOJI.get(riesgo, '🟡 <b>RIESGO MEDIO</b>')
+        
+        titulo = cat.get('titulo', 'Sin título')
+        categoria = cat.get('categoria', '').replace('_', ' ').title()
+        que_paso = cat.get('que_paso', '')
+        impacto = cat.get('impacto', '')
+        
+        # Truncar si es muy largo
+        if len(titulo) > 85:
+            titulo = titulo[:82] + "..."
+        
+        lines.append(f"{emoji} {categoria}")
+        lines.append(f"  <b>{titulo}</b>")
+        
+        if que_paso:
+            que_paso_short = que_paso[:100] + "..." if len(que_paso) > 100 else que_paso
+            lines.append(f"  📌 {que_paso_short}")
+        
+        if impacto:
+            impacto_short = impacto[:120] + "..." if len(impacto) > 120 else impacto
+            lines.append(f"  📈 Impacto: {impacto_short}")
+        
+        lines.append("")
+    
+    return "\n".join(lines)
+
+
 def _fmt_macro_news_summary(macro_news: list) -> str:
     """
     Resumen de noticias macro/geopolíticas de la semana.
@@ -384,6 +437,13 @@ async def send_weekly_report(
             await asyncio.sleep(1)
             await _send_message(bot, chat_id, news_text)
             logger.info("Telegram: noticias confirmadoras enviadas")
+
+        # 2c. Enviar catalizadores de la semana
+        cat_text = _fmt_catalizadores_summary(regime_data or {})
+        if cat_text:
+            await asyncio.sleep(1)
+            await _send_message(bot, chat_id, cat_text)
+            logger.info("Telegram: catalizadores enviados")
 
         # 3. Adjuntar PDF
         if pdf_ok and os.path.exists(pdf_path):
