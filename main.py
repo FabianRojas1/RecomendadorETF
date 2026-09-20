@@ -82,7 +82,7 @@ async def run_weekly_analysis():
     titulares = []
     for t in ("SPY", "BTC"):
         try:
-            titulares.extend(news_a.get_news_for_ticker(t, days=7))
+            titulares.extend(news_a.get_news_for_ticker(t, days=30))
         except Exception as e:
             logger.debug("Sin titulares para %s: %s", t, e)
 
@@ -123,7 +123,7 @@ async def run_weekly_analysis():
             ind    = calc.calculate()
             values = calc.get_current(ind)
 
-            news   = news_a.get_news_for_ticker(ticker, days=7)
+            news   = news_a.get_news_for_ticker(ticker, days=30)
             result = scorer.score(values, news)
 
             # Motor LP/MP (checklists de largo y mediano plazo)
