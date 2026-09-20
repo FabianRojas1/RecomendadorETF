@@ -247,87 +247,159 @@ def _fetch_fred_macro() -> dict:
         return {"name": name, "value": "N/D", "prev": "—",
                 "dir": "—", "signal": "N/D", "note": note}
 
-    # ── Tasa FED (SOFR + Treasury Bill) ───────────────────────────────────────────
-    # Nota: FEDFUNDS en FRED tiene retraso. Usar SOFR (tiempo real) y T-Bill de 3m.
+    # -- Tasa FED (FEDFUNDS + SOFR como watchdog) -----------
+    # Estrategia: Signal basada en RANGO DE FEDFUNDS (cambios mes anterior vs actual)
+    #            SOFR es informativo (verifica si FEDFUNDS está actualizado)
     fed_rate_fresco = None
+    
     try:
-        # Intentar con SOFR primero (publicado diariamente por NY Fed)
-        df_sofr = web.DataReader("SOFR", "fred", start=start)
-        if df_sofr is not None and len(df_sofr) >= 2:
-            v_sofr = float(df_sofr.iloc[-1, 0])
-            p_sofr = float(df_sofr.iloc[-2, 0])
-            d = "↑" if v_sofr > p_sofr + 0.05 else ("↓" if v_sofr < p_sofr - 0.05 else "↔")
-            s = "BAJISTA" if v_sofr > p_sofr + 0.05 else ("ALCISTA" if v_sofr < p_sofr - 0.05 else "NEUTRAL")
+        # FEDFUNDS: obtener últimos 3 meses para ver tendencia
+        df_fed = _fred("FEDFUNDS")
+        if df_fed is not None and len(df_fed) >= 3:
+            fed_now = float(df_fed.iloc[-1, 0])   # Mes actual
+            fed_1m = float(df_fed.iloc[-2, 0])    # Mes anterior
+            fed_2m = float(df_fed.iloc[-3, 0])    # Hace 2 meses
+            
+            # Determinar cambio de FEDFUNDS (política monetaria)
+            if fed_now > fed_1m + 0.10:
+                cambio = "↑ SUBIO"
+                signal_fed = "BAJISTA"
+            elif fed_now < fed_1m - 0.10:
+                cambio = "↓ BAJO"
+                signal_fed = "ALCISTA"
+            else:
+                cambio = "↔ Sin cambio"
+                signal_fed = "NEUTRAL"
+            
+            # Tendencia últimos 3 meses
+            if fed_2m > fed_now:
+                tendencia = "↓ bajista"
+            elif fed_2m < fed_now:
+                tendencia = "↑ alcista"
+            else:
+                tendencia = "→ estable"
+            
+            # Obtener SOFR para verificación (solo informativo)
+            sofr_nota = ""
+            try:
+                df_sofr = web.DataReader("SOFR", "fred", start=start)
+                if df_sofr is not None and len(df_sofr) >= 1:
+                    sofr_actual = float(df_sofr.iloc[-1, 0])
+                    fed_lower = fed_now - 0.125
+                    fed_upper = fed_now + 0.125
+                    if sofr_actual > fed_upper:
+                        sofr_nota = f"
+⚠️ REVISAR: SOFR {sofr_actual:.2f}% ARRIBA del rango {fed_lower:.2f}-{fed_upper:.2f}%"
+                    elif sofr_actual < fed_lower:
+                        sofr_nota = f"
+⚠️ REVISAR: SOFR {sofr_actual:.2f}% ABAJO del rango {fed_lower:.2f}-{fed_upper:.2f}%"
+                    else:
+                        sofr_nota = f"
+✓ SOFR {sofr_actual:.2f}% dentro del rango {fed_lower:.2f}-{fed_upper:.2f}%"
+            except:
+                sofr_nota = ""
+            
             fed_rate_fresco = {
-                "name": "Tasa FED (SOFR)",
-                "value": f"{v_sofr:.2f}%",
-                "prev": f"{p_sofr:.2f}% (día ant.)",
-                "dir": d, "signal": s,
-                "note": "SOFR: tasa overnight time-real de NY Fed. Más fresca que FEDFUNDS.",
+                "name": "Tasa FED (FEDFUNDS)",
+                "value": f"{fed_now:.2f}%",
+                "prev": f"{fed_1m:.2f}% (mes ant.)",
+                "dir": "↑" if signal_fed == "BAJISTA" else ("↓" if signal_fed == "ALCISTA" else "↔"),
+                "signal": signal_fed,
+                "note": f"{cambio} | Tendencia 3m: {tendencia}{sofr_nota}",
             }
     except:
         pass
     
-    # Si SOFR falla, intentar FEDFUNDS (con fallback a datos más viejos)
-    if fed_rate_fresco is None:
-        df = _fred("FEDFUNDS")
-        if df is not None and len(df) >= 3:
-            v = float(df.iloc[-1, 0])
-            p = float(df.iloc[-3, 0])  # Comparar contra hace 2 meses para ver tendencia
-            d = "↑" if v > p + 0.25 else ("↓" if v < p - 0.25 else "↔")
-            s = "BAJISTA" if v > p + 0.25 else ("ALCISTA" if v < p - 0.25 else "NEUTRAL")
-            fed_rate_fresco = {
-                "name": "Tasa FED (FEDFUNDS)",
-                "value": f"{v:.2f}%",
-                "prev": f"{p:.2f}% (hace 2m)",
-                "dir": d, "signal": s,
-                "note": "FEDFUNDS con retraso. Comparación sobre 2 meses para ver cambios significativos.",
-            }
-    
     out["fed_rate"] = fed_rate_fresco if fed_rate_fresco else _nd("Tasa FED")
 
-    # ── Inflación CPI YoY (CPIAUCSL) ─────────────────────────────────────────
+    # -- Inflacion CPI YoY (CPIAUCSL) --------
+    # Signal basada en TENDENCIA (aceleracion/desaceleracion), no nivel absoluto
+    # Justificacion: llevan anos por encima de la meta, lo que importa es si mejora o empeora
     df = _fred("CPIAUCSL")
     if df is not None and len(df) >= 14:
         v0   = float(df.iloc[-1,  0])   # mes actual
         v1   = float(df.iloc[-2,  0])   # mes anterior
         v13  = float(df.iloc[-13, 0])   # hace 12 meses
         v14  = float(df.iloc[-14, 0])   # hace 13 meses
+        
+        # Calcular YoY para mes actual y anterior
         yoy     = (v0 / v13 - 1) * 100
         yoy_prv = (v1 / v14 - 1) * 100
-        d = "↑" if yoy > yoy_prv + 0.05 else ("↓" if yoy < yoy_prv - 0.05 else "↔")
-        s = "BAJISTA" if yoy > 3.5 else ("ALCISTA" if yoy < 2.5 else "NEUTRAL")
+        
+        # METRICA PRINCIPAL: Tendencia (aceleracion/desaceleracion)
+        yoy_change = yoy - yoy_prv
+        
+        if yoy_change > 0.3:
+            s = "BAJISTA"  # inflacion acelerando (empeorando)
+            trend_msg = "↑ acelerando"
+        elif yoy_change < -0.3:
+            s = "ALCISTA"   # inflacion desacelerando (mejorando)
+            trend_msg = "↓ desacelerando"
+        else:
+            s = "NEUTRAL"  # tendencia estable
+            trend_msg = "→ estable"
+        
+        # Direccion visual basada en cambio
+        d = "↑" if yoy_change > 0.1 else ("↓" if yoy_change < -0.1 else "↔")
+        
         out["cpi_yoy"] = {
+            "name":  "Inflacion CPI",
+            "value": f"{yoy:.1f}% YoY",
+            "prev":  f"~{yoy_prv:.1f}% (mes ant.)",
+            "dir": d, "signal": s,
+            "note": f"Meta FED 2%  |  Tendencia: {trend_msg} ({yoy_change:+.2f}%)",
+        }
+    else:
+        out["cpi_yoy"] = _nd("Inflacion CPI")
             "name":  "Inflación CPI",
             "value": f"{yoy:.1f}% YoY",
             "prev":  f"~{yoy_prv:.1f}% (mes ant.)",
             "dir": d, "signal": s,
-            "note": f"Meta FED: 2%  |  {'Sobre umbral 3.5%' if yoy > 3.5 else 'Convergiendo al objetivo'}",
+            "note": f"Meta FED 2%  |  YoY: {yoy:.1f}% ({'↑ acelerando' if yoy_change > 0.15 else '↓ desacelerando' if yoy_change < -0.15 else '↔ estable'})",
         }
     else:
         out["cpi_yoy"] = _nd("Inflación CPI")
 
     # ── NFP — Empleo No Agrícola (PAYEMS) ─────────────────────────────────────
     # PAYEMS está en miles de trabajadores; el diff mensual = variación NFP
+    # Usar 3-month MA para evitar revisiones masivas (-50K típicamente 3 semanas después)
     df = _fred("PAYEMS")
-    if df is not None and len(df) >= 3:
-        changes  = df.diff().dropna()
-        nfp_now  = float(changes.iloc[-1, 0])   # miles de empleos añadidos
-        nfp_prev = float(changes.iloc[-2, 0])
-        d = "↑" if nfp_now > nfp_prev + 10 else ("↓" if nfp_now < nfp_prev - 10 else "↔")
-        s = "BAJISTA" if nfp_now < 100 else ("ALCISTA" if nfp_now > 150 else "NEUTRAL")
+    if df is not None and len(df) >= 5:
+        changes = df.diff().dropna()
+        
+        # Calcular promedio de 3 meses en lugar de MoM puro
+        if len(changes) >= 3:
+            nfp_3m_avg = float(changes.iloc[-3:, 0].mean())
+            nfp_prev_3m = float(changes.iloc[-6:-3, 0].mean()) if len(changes) >= 6 else float(changes.iloc[-4:-3, 0].mean())
+        else:
+            nfp_3m_avg = float(changes.iloc[-1, 0])
+            nfp_prev_3m = float(changes.iloc[-2, 0]) if len(changes) >= 2 else nfp_3m_avg
+        
+        # Threshold más amplio para suavizar volatilidad
+        d = "↑" if nfp_3m_avg > nfp_prev_3m + 50 else ("↓" if nfp_3m_avg < nfp_prev_3m - 50 else "↔")
+        
+        # Signal basado en tendencia
+        if nfp_3m_avg > 150:
+            s = "ALCISTA"   # mercado laboral fuerte
+        elif nfp_3m_avg < 75:
+            s = "BAJISTA"   # debilitamiento → Fed puede cortar
+        else:
+            s = "NEUTRAL"
+        
         fmt = lambda x: f"+{x:.0f}K" if x >= 0 else f"{x:.0f}K"
+        preliminary_warning = "  [PRELIMINAR: se revisa típicamente -50K en 3 semanas]"
+        
         out["nfp"] = {
-            "name":  "NFP Empleo",
-            "value": fmt(nfp_now),
-            "prev":  f"{fmt(nfp_prev)} (mes ant.)",
+            "name":  "NFP Empleo (3m MA)",
+            "value": fmt(nfp_3m_avg),
+            "prev":  fmt(nfp_prev_3m),
             "dir": d, "signal": s,
-            "note": "> 150K alcista  |  < 100K bajista (Fed puede cortar)",
+            "note": f"> 150K alcista  |  < 75K bajista{preliminary_warning}",
         }
     else:
         out["nfp"] = _nd("NFP Empleo")
 
-    # ── PIB EE.UU. (GDP) ──────────────────────────────────────────────────────
+    # ──    # ── PIB EE.UU. (GDP) ──────────────────────────────────────────────────────
     # GDP en miles de millones $. Tasa anualizada = ((v_now/v_prev)^4 - 1) * 100
     df = _fred("GDP")
     if df is not None and len(df) >= 3:
@@ -338,71 +410,127 @@ def _fetch_fred_macro() -> dict:
         gr_prev = ((v1 / v2) ** 4 - 1) * 100
         d = "↑" if gr_now > gr_prev + 0.15 else ("↓" if gr_now < gr_prev - 0.15 else "↔")
         s = "ALCISTA" if gr_now > 2.5 else ("BAJISTA" if gr_now < 1.5 else "NEUTRAL")
+        
+        # Detectar si es rápida, segunda o final lectura (basado en días desde cierre de trimestre)
+        from datetime import datetime
+        last_gdp_date = df.index[-1].to_pydatetime() if hasattr(df, 'index') else datetime.now()
+        days_since = (datetime.now() - last_gdp_date).days
+        
+        # Si < 35 días, es RÁPIDA; 35-65 días = SEGUNDA; > 65 días = FINAL
+        if days_since < 35:
+            version_warning = "[RÁPIDA: sujeta a revisión -0.3% típicamente]"
+        elif days_since < 65:
+            version_warning = "[SEGUNDA LECTURA]"
+        else:
+            version_warning = "[FINAL]"
+        
         out["gdp"] = {
             "name":  "PIB EE.UU.",
             "value": f"{gr_now:+.1f}% anualizado",
             "prev":  f"{gr_prev:+.1f}% (trim. ant.)",
             "dir": d, "signal": s,
-            "note": "> 2.5% alcista  |  < 1.5% zona de riesgo",
+            "note": f"> 2.5% alcista  |  < 1.5% zona de riesgo  {version_warning}",
         }
     else:
         out["gdp"] = _nd("PIB EE.UU.")
 
-    # ── UMich Consumer Sentiment (UMCSENT) ────────────────────────────────────
+    #     # ── UMich Consumer Sentiment (UMCSENT) ────────────────────────────────────
     df = _fred("UMCSENT")
     if df is not None and len(df) >= 2:
-        v = float(df.iloc[-1, 0])
-        p = float(df.iloc[-2, 0])
-        d = "↑" if v > p + 0.5 else ("↓" if v < p - 0.5 else "↔")
-        s = "BAJISTA" if v < 55 else ("ALCISTA" if v > 80 else "NEUTRAL")
+        v  = float(df.iloc[-1, 0])
+        p1 = float(df.iloc[-2, 0])  # mes anterior
+        
+        # Cambio: usar threshold ±4 puntos (cambio real, no ruido)
+        change_1m = v - p1
+        d = "↑" if change_1m > 4 else ("↓" if change_1m < -4 else "↔")
+        
+        # Signal: basado en NIVEL absoluto (más importante que cambio MoM)
+        if v > 80:
+            s = "ALCISTA"    # consumidor muy optimista
+        elif v < 55:
+            s = "BAJISTA"    # consumidor muy pesimista
+        else:
+            s = "NEUTRAL"
+        
+        # Nota: alertar si cambio reciente es importante
+        trend_note = ""
+        if change_1m > 4:
+            trend_note = "  [Mejorando]"
+        elif change_1m < -4:
+            trend_note = "  [Empeorando]"
+        
         out["umich"] = {
             "name":  "UMich Sentiment",
             "value": f"{v:.1f}",
-            "prev":  f"{p:.1f} (mes ant.)",
+            "prev":  f"{p1:.1f} (mes ant.)",
             "dir": d, "signal": s,
-            "note": "< 55 consumidor pesimista  |  > 80 optimista",
+            "note": f"< 55 pesimista  |  > 80 optimista{trend_note}",
         }
     else:
         out["umich"] = _nd("UMich Sentiment")
 
-    # ── Solicitudes de Desempleo Iniciales (ICSA) ─────────────────────────────
-    # ICSA en número de personas (no en miles); dividir para mostrar en K
+        # ── Solicitudes de Desempleo Iniciales (ICSA) ─────────────────────────────
+    # ICSA en número de personas (no en miles); usar 4-week MA para suavizar volatilidad
     df = _fred("ICSA")
-    if df is not None and len(df) >= 2:
-        v = float(df.iloc[-1, 0])
-        p = float(df.iloc[-2, 0])
-        d = "↑" if v > p * 1.01 else ("↓" if v < p * 0.99 else "↔")
-        s = "BAJISTA" if v > 260_000 else ("ALCISTA" if v < 210_000 else "NEUTRAL")
+    if df is not None and len(df) >= 8:  # 8 semanas = ~2 meses de datos
+        # Últimas 4 semanas vs 4 semanas previas (evita overlap)
+        claims_4w_avg = float(df.iloc[-4:, 0].mean())
+        claims_4w_prev = float(df.iloc[-8:-4, 0].mean())
+        
+        # Direction: cambio significativo > 5% en el promedio
+        pct_change = (claims_4w_avg - claims_4w_prev) / claims_4w_prev * 100
+        d = "↑" if pct_change > 5 else ("↓" if pct_change < -5 else "↔")
+        
+        # Signal: basado en NIVEL absoluto
+        if claims_4w_avg > 260_000:
+            s = "BAJISTA"  # mercado laboral debilitándose
+        elif claims_4w_avg < 210_000:
+            s = "ALCISTA"  # mercado laboral fuerte
+        else:
+            s = "NEUTRAL"
+        
+        fmt = lambda x: f"{x/1000:.0f}K"
         out["initial_claims"] = {
-            "name":  "Solicitudes Desempleo",
-            "value": f"{v/1000:.0f}K",
-            "prev":  f"{p/1000:.0f}K (sem. ant.)",
+            "name":  "Solicitudes Desempleo (4w MA)",
+            "value": fmt(claims_4w_avg),
+            "prev":  fmt(claims_4w_prev),
             "dir": d, "signal": s,
-            "note": "> 260K señal de debilitamiento laboral",
+            "note": "> 260K debilitamiento  |  < 210K mercado laboral fuerte",
         }
     else:
         out["initial_claims"] = _nd("Solicitudes Desempleo")
 
-    # ── ISM Manufacturing PMI (NAPM) ──────────────────────────────────────────
+        # ── ISM Manufacturing PMI (NAPM) ──────────────────────────────────────
     df = _fred("NAPM")
     if df is not None and len(df) >= 2:
         v = float(df.iloc[-1, 0])
         p = float(df.iloc[-2, 0])
-        d = "↑" if v > p + 0.1 else ("↓" if v < p - 0.1 else "↔")
-        s = "ALCISTA" if v > 50 else "BAJISTA"
+        
+        # Direction: threshold ±1.5 puntos (cambio real, no ruido de redondeo)
+        d = "↑" if v > p + 1.5 else ("↓" if v < p - 1.5 else "↔")
+        
+        # Signal: regla 50 es PRIMARIA (expansión vs contracción)
+        if v > 50 and p <= 50:
+            s = "ALCISTA"  # cruzó de contracción a expansión
+        elif v <= 50 and p > 50:
+            s = "BAJISTA"  # cruzó de expansión a contracción
+        elif v > 50:
+            s = "ALCISTA"  # sigue en expansión
+        else:
+            s = "BAJISTA"  # sigue en contracción
+        
         out["ism_pmi"] = {
             "name":  "ISM Manufacturing PMI",
             "value": f"{v:.1f}",
             "prev":  f"{p:.1f} (mes ant.)",
             "dir": d, "signal": s,
-            "note": "> 50 expansión manufacturera",
+            "note": "> 50 expansión  |  < 50 contracción  |  [Nota: Manufactura 11% economía; ver ISM Services]",
         }
     else:
-        # ISM a veces no está disponible en FRED (datos privados)
         out["ism_pmi"] = _nd("ISM Manufacturing PMI",
                              note="Datos privados — ver ISM.report/manufacturing")
 
-    logger.info("Indicadores FRED obtenidos: %d/%d",
+        logger.info("Indicadores FRED obtenidos: %d/%d",
                 sum(1 for v in out.values() if v.get("value") != "N/D"), len(out))
     return out
 

@@ -62,15 +62,18 @@ def _fmt_strong_summary(recommendations: List[dict], portfolio_total: float, cop
     if compras:
         lines.append("🟢 <b>COMPRA</b>")
         for r in compras:
-            ticker  = r.get("ticker","")
-            score   = r.get("score", 0)
-            price   = r.get("price_usd") or 0
-            target  = r.get("target_usd") or 0
-            sl      = r.get("stop_loss_usd") or 0
-            sq      = r.get("squeeze_state","")
-            adx_v   = r.get("adx_value", 0) or 0
-            flag    = " ⚡Squeeze" if (sq == "released" and adx_v > SQUEEZE_ADX_MIN) else ""
-            line    = f"  • <b>{ticker}</b>  {score:+.1f}/40  |  ${price:.2f}"
+            ticker = r.get("ticker","")
+            segmento = r.get("asset_subtype", "") or r.get("asset_type", "")
+            score = r.get("score", 0)
+            price = r.get("price_usd") or 0
+            target = r.get("target_usd") or 0
+            sl = r.get("stop_loss_usd") or 0
+            sq = r.get("squeeze_state","")
+            adx_v = r.get("adx_value", 0) or 0
+            flag = " ⚡Squeeze" if (sq == "released" and adx_v > SQUEEZE_ADX_MIN) else ""
+            # Mostrar ticker + segmento
+            ticker_str = f"{ticker} ({segmento})" if segmento else ticker
+            line = f"  • <b>{ticker_str}</b>  {score:+.1f}/40  |  ${price:.2f}"
             if target: line += f"  → ${target:.2f}"
             if sl:     line += f"  SL ${sl:.2f}"
             line += flag
@@ -80,14 +83,17 @@ def _fmt_strong_summary(recommendations: List[dict], portfolio_total: float, cop
     if ventas:
         lines.append("🔴 <b>VENTA</b>")
         for r in ventas:
-            ticker  = r.get("ticker","")
-            score   = r.get("score", 0)
-            price   = r.get("price_usd") or 0
-            sl      = r.get("stop_loss_usd") or 0
-            sq      = r.get("squeeze_state","")
-            adx_v   = r.get("adx_value", 0) or 0
-            flag    = " ⚡Squeeze" if (sq == "released" and adx_v > SQUEEZE_ADX_MIN) else ""
-            line    = f"  • <b>{ticker}</b>  {score:+.1f}/40  |  ${price:.2f}"
+            ticker = r.get("ticker","")
+            segmento = r.get("asset_subtype", "") or r.get("asset_type", "")
+            score = r.get("score", 0)
+            price = r.get("price_usd") or 0
+            sl = r.get("stop_loss_usd") or 0
+            sq = r.get("squeeze_state","")
+            adx_v = r.get("adx_value", 0) or 0
+            flag = " ⚡Squeeze" if (sq == "released" and adx_v > SQUEEZE_ADX_MIN) else ""
+            # Mostrar ticker + segmento
+            ticker_str = f"{ticker} ({segmento})" if segmento else ticker
+            line = f"  • <b>{ticker_str}</b>  {score:+.1f}/40  |  ${price:.2f}"
             if sl:   line += f"  SL ${sl:.2f}"
             line   += flag
             lines.append(line)
@@ -148,6 +154,70 @@ def _classify_sentiment(title: str, description: str) -> str:
     if p > n:   return "positive"
     elif n > p: return "negative"
     return "neutral"
+
+
+def _fmt_macro_news_summary(macro_news: list) -> str:
+    """
+    Resumen de noticias macro/geopolíticas de la semana.
+    
+    Args:
+        macro_news: Lista de dicts con {title, source, url, published_at, impacto}
+    
+    Returns:
+        Texto formateado para Telegram sin análisis de sentimiento.
+    """
+    if not macro_news:
+        return (
+            "📰 <b>NOTICIAS MACRO</b>
+
+"
+            "<i>No se encontraron noticias macro/geopolíticas importantes esta semana.</i>"
+        )
+    
+    lines = ["📰 <b>NOTICIAS MACRO DE LA SEMANA</b>
+"]
+    
+    # Agrupar por impacto
+    por_impacto = {'alto': [], 'medio': [], 'contexto': []}
+    for item in macro_news:
+        impacto = item.get('impacto', 'contexto')
+        por_impacto[impacto].append(item)
+    
+    # Emoji e icono por impacto
+    IMPACTO_EMOJI = {
+        'alto': '🔴 <b>ALTO IMPACTO</b>',
+        'medio': '🟡 <b>MEDIO IMPACTO</b>',
+        'contexto': '🟢 <b>CONTEXTO</b>',
+    }
+    
+    for impacto in ['alto', 'medio', 'contexto']:
+        items = por_impacto[impacto]
+        if not items:
+            continue
+        
+        lines.append(IMPACTO_EMOJI[impacto])
+        for item in items:
+            title = item.get('title', 'Sin título')
+            source = item.get('source', 'Desconocido')
+            pub = item.get('published_at', '')
+            url = item.get('url', '')
+            
+            # Truncar título si es muy largo
+            if len(title) > 95:
+                title = title[:92] + "..."
+            
+            meta = f"{source} | {pub}" if pub else source
+            lines.append(f"  • <b>{title}</b>")
+            lines.append(f"     <i>{meta}</i>")
+            
+            if url and url.startswith('http'):
+                lines.append(f"     🔗 {url}")
+        
+        lines.append("")
+    
+    lines.append("<i>Lee y analiza por tu propia cuenta. Sin análisis de sentimiento del bot.</i>")
+    return "
+".join(lines)
 
 
 def _fmt_news_summary(recommendations: list) -> str:
@@ -268,6 +338,7 @@ async def send_weekly_report(
     bot_token: str,
     chat_id: str,
     regime_data: dict = None,
+    macro_news: list = None,
 ) -> bool:
     """
     Flujo completo del reporte semanal:
@@ -311,7 +382,8 @@ async def send_weekly_report(
         logger.info("Telegram: resumen de señales enviado")
 
         # 2b. Enviar noticias que confirman señal (solo si hay contenido relevante)
-        news_text = _fmt_news_summary(recommendations)
+        # Usar noticias macro en lugar de análisis por ticker
+        news_text = _fmt_macro_news_summary(macro_news or [])
         if news_text:
             await asyncio.sleep(1)
             await _send_message(bot, chat_id, news_text)

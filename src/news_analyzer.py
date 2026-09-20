@@ -24,6 +24,34 @@ NEGATIVE_WORDS = [
     'tariffs', 'inflation', 'stagflation', 'default', 'layoff', 'layoffs',
 ]
 
+# Palabras clave para clasificar impacto de noticias macro
+MACRO_KEYWORDS_ALTO = [
+    'fed rate hike', 'fed cuts rates', 'federal reserve', 'central bank',
+    'china tariff', 'us tariff', 'trade war', 'geopolitical crisis',
+    'russia ukraine', 'middle east conflict', 'nuclear threat',
+    'market crash', 'recession', 'financial crisis', 'bank failure',
+]
+
+MACRO_KEYWORDS_MEDIO = [
+    'inflation', 'cpi', 'unemployment', 'jobless', 'gdp', 'earnings',
+    'interest rates', 'bond yield', 'dollar strength', 'yuan', 'semiconductor',
+    'chip shortage', 'supply chain', 'energy prices', 'oil prices',
+    'corporate earnings', 'guidance cut',
+]
+
+MACRO_KEYWORDS_CONTEXTO = [
+    'market', 'stock', 'economic data', 'analyst', 'forecast',
+    'consumer', 'business', 'investment', 'portfolio', 'asset',
+]
+
+FUENTES_CONFIABLES = {
+    'bloomberg', 'reuters', 'financial times', 'cnbc', 'wsj',
+    'wall street journal', 'yahoo finance', 'marketwatch', 'seeking alpha',
+    'economist', 'ft.com', 'ft', 'bloomberg intelligence',
+    'federal reserve', 'bank of america', 'goldman sachs', 'jpmorgan',
+}
+
+
 
 class NewsAnalyzer:
     """
@@ -38,6 +66,73 @@ class NewsAnalyzer:
         self.keywords = config.NEWS_KEYWORDS
 
     # ── Public ────────────────────────────────────────────────────────────────
+
+    def get_macro_news(self, days: int = 7, max_results: int = 10) -> list:
+        """
+        Obtiene noticias macro/geopolíticas de la última semana.
+        Retorna sin análisis de sentimiento — deja que el usuario interprete.
+        """
+        if not self.api_key:
+            logger.warning("NEWS_API_KEY not set; skipping macro news")
+            return []
+        
+        keywords = [
+            'fed rate', 'federal reserve', 'inflation cpi',
+            'unemployment jobs', 'gdp economic',
+            'china tariff trade', 'geopolitical crisis',
+            'interest rates bond', 'stock market earnings',
+        ]
+        
+        all_articles = []
+        for kw in keywords[:6]:  # Máx 6 búsquedas
+            fetched = self._fetch(kw, days, page_size=10)
+            all_articles.extend(fetched)
+        
+        # Deduplicar
+        seen = set()
+        unique = []
+        for a in all_articles:
+            url = a.get('url', '')
+            if url not in seen:
+                seen.add(url)
+                unique.append(a)
+        
+        # Filtrar y clasificar por impacto
+        classified = []
+        for article in unique:
+            source = (article.get('source', '') or '').lower()
+            title = (article.get('title', '') or '').lower()
+            
+            # Verificar fuente confiable
+            if not any(fs in source for fs in FUENTES_CONFIABLES):
+                continue
+            
+            # Clasificar impacto
+            if any(kw in title for kw in MACRO_KEYWORDS_ALTO):
+                impacto = 'alto'
+            elif any(kw in title for kw in MACRO_KEYWORDS_MEDIO):
+                impacto = 'medio'
+            else:
+                impacto = 'contexto'
+            
+            classified.append({
+                'title':        article['title'],
+                'source':       article['source'],
+                'url':          article['url'],
+                'published_at': article['published_at'],
+                'impacto':      impacto,
+            })
+        
+        # Ordenar por impacto
+        classified.sort(key=lambda x: (
+            {'alto': 0, 'medio': 1, 'contexto': 2}[x['impacto']]
+        ))
+        
+        logger.info("Macro news: %d total, %d unique, %d classified",
+                    len(all_articles), len(unique), len(classified))
+        
+        return classified[:max_results]
+
 
     def get_news_for_ticker(self, ticker: str, days: int = 7) -> list:
         """
@@ -86,7 +181,7 @@ class NewsAnalyzer:
 
     # ── Private ───────────────────────────────────────────────────────────────
 
-    def _fetch(self, keyword: str, days: int) -> list:
+    def _fetch(self, keyword: str, days: int, page_size: int = 5) -> list:
         """Call NewsAPI and return processed articles."""
         from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
 
@@ -95,7 +190,7 @@ class NewsAnalyzer:
             'from':     from_date,
             'sortBy':   'publishedAt',
             'language': 'en',
-            'pageSize': 5,
+            'pageSize': page_size,
             'apiKey':   self.api_key,
         }
 

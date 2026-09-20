@@ -148,7 +148,51 @@ async def run_weekly_analysis():
             senales = {"lp": lp_res, "mp": mp_res, "combinada": comb}
 
             score     = result["score"]
-            action    = result["action"]
+            # Action primaria: combinar() de LP/MP (no scorer técnico)
+
+            # Razón: LP/MP contiene la recomendación de TENER/NO TENER/SALIR
+
+            #        scorer solo mide momentum técnico y puede contradecir LP/MP
+
+            accion_combinada = senales["combinada"].get("accion", "SIN DATOS")
+
+            
+
+            # Mapeo: conversión de acciones LP/MP a categorías de PDF
+
+            _accion_map = {
+
+                "VENTA TOTAL": "VENTA FUERTE",
+
+                "REDUCIR 50%": "VENTA DEBIL",
+
+                "RECORTE TACTICO": "VENTA DEBIL",
+
+                "COMPRAR": "COMPRA FUERTE",
+
+                "COMPRAR (LP)": "COMPRA DEBIL",
+
+                "ENTRADA TACTICA": "COMPRA DEBIL",
+
+                "MANTENER": "MANTENER",
+
+                "VIGILAR": "MANTENER",
+
+                "NO TENER": "VENTA FUERTE",
+
+                "SIN DATOS": "MANTENER",
+
+            }
+
+            action = _accion_map.get(accion_combinada, "MANTENER")
+
+            
+
+            # Guardar también el score técnico para referencia
+
+            tech_score = result["score"]
+
+            tech_action = result["action"]
             breakdown = result["breakdown"]
 
             price_usd = values.get("close") or 0
@@ -218,6 +262,10 @@ async def run_weekly_analysis():
     portfolio_total = portfolio["current_value"].astype(float).sum()
 
     logger.info("Enviando reporte a Telegram (chat_id=%s)...", CHAT_ID[:6] + "***" if CHAT_ID else "VACÍO")
+    # Obtener noticias macro de la semana
+    macro_news = news_a.get_macro_news(days=7, max_results=10)
+    logger.info("Noticias macro obtenidas: %d items", len(macro_news))
+    
     ok = await send_weekly_report(
         recommendations=recommendations,
         portfolio_total_cop=portfolio_total,
@@ -225,6 +273,7 @@ async def run_weekly_analysis():
         bot_token=BOT_TOKEN,
         chat_id=CHAT_ID,
         regime_data=regime_data,
+        macro_news=macro_news,
     )
     if ok:
         logger.info("Reporte enviado a Telegram: OK")
