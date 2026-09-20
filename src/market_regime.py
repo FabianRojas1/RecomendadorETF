@@ -247,22 +247,44 @@ def _fetch_fred_macro() -> dict:
         return {"name": name, "value": "N/D", "prev": "—",
                 "dir": "—", "signal": "N/D", "note": note}
 
-    # ── Tasa FED (FEDFUNDS) ───────────────────────────────────────────────────
-    df = _fred("FEDFUNDS")
-    if df is not None and len(df) >= 2:
-        v = float(df.iloc[-1, 0])
-        p = float(df.iloc[-2, 0])
-        d = "↑" if v > p + 0.01 else ("↓" if v < p - 0.01 else "↔")
-        s = "BAJISTA" if v > p + 0.01 else ("ALCISTA" if v < p - 0.01 else "NEUTRAL")
-        out["fed_rate"] = {
-            "name": "Tasa FED",
-            "value": f"{v:.2f}%",
-            "prev":  f"{p:.2f}% (mes ant.)",
-            "dir": d, "signal": s,
-            "note": "Pausa activa — vigilar decisiones FOMC",
-        }
-    else:
-        out["fed_rate"] = _nd("Tasa FED")
+    # ── Tasa FED (SOFR + Treasury Bill) ───────────────────────────────────────────
+    # Nota: FEDFUNDS en FRED tiene retraso. Usar SOFR (tiempo real) y T-Bill de 3m.
+    fed_rate_fresco = None
+    try:
+        # Intentar con SOFR primero (publicado diariamente por NY Fed)
+        df_sofr = web.DataReader("SOFR", "fred", start=start)
+        if df_sofr is not None and len(df_sofr) >= 2:
+            v_sofr = float(df_sofr.iloc[-1, 0])
+            p_sofr = float(df_sofr.iloc[-2, 0])
+            d = "↑" if v_sofr > p_sofr + 0.05 else ("↓" if v_sofr < p_sofr - 0.05 else "↔")
+            s = "BAJISTA" if v_sofr > p_sofr + 0.05 else ("ALCISTA" if v_sofr < p_sofr - 0.05 else "NEUTRAL")
+            fed_rate_fresco = {
+                "name": "Tasa FED (SOFR)",
+                "value": f"{v_sofr:.2f}%",
+                "prev": f"{p_sofr:.2f}% (día ant.)",
+                "dir": d, "signal": s,
+                "note": "SOFR: tasa overnight time-real de NY Fed. Más fresca que FEDFUNDS.",
+            }
+    except:
+        pass
+    
+    # Si SOFR falla, intentar FEDFUNDS (con fallback a datos más viejos)
+    if fed_rate_fresco is None:
+        df = _fred("FEDFUNDS")
+        if df is not None and len(df) >= 3:
+            v = float(df.iloc[-1, 0])
+            p = float(df.iloc[-3, 0])  # Comparar contra hace 2 meses para ver tendencia
+            d = "↑" if v > p + 0.25 else ("↓" if v < p - 0.25 else "↔")
+            s = "BAJISTA" if v > p + 0.25 else ("ALCISTA" if v < p - 0.25 else "NEUTRAL")
+            fed_rate_fresco = {
+                "name": "Tasa FED (FEDFUNDS)",
+                "value": f"{v:.2f}%",
+                "prev": f"{p:.2f}% (hace 2m)",
+                "dir": d, "signal": s,
+                "note": "FEDFUNDS con retraso. Comparación sobre 2 meses para ver cambios significativos.",
+            }
+    
+    out["fed_rate"] = fed_rate_fresco if fed_rate_fresco else _nd("Tasa FED")
 
     # ── Inflación CPI YoY (CPIAUCSL) ─────────────────────────────────────────
     df = _fred("CPIAUCSL")
