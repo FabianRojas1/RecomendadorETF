@@ -288,14 +288,11 @@ def _fetch_fred_macro() -> dict:
                     fed_lower = fed_now - 0.125
                     fed_upper = fed_now + 0.125
                     if sofr_actual > fed_upper:
-                        sofr_nota = f"
-⚠️ REVISAR: SOFR {sofr_actual:.2f}% ARRIBA del rango {fed_lower:.2f}-{fed_upper:.2f}%"
+                        sofr_nota = f"⚠️ REVISAR: SOFR {sofr_actual:.2f}% ARRIBA del rango {fed_lower:.2f}-{fed_upper:.2f}%"
                     elif sofr_actual < fed_lower:
-                        sofr_nota = f"
-⚠️ REVISAR: SOFR {sofr_actual:.2f}% ABAJO del rango {fed_lower:.2f}-{fed_upper:.2f}%"
+                        sofr_nota = f"⚠️ REVISAR: SOFR {sofr_actual:.2f}% ABAJO del rango {fed_lower:.2f}-{fed_upper:.2f}%"
                     else:
-                        sofr_nota = f"
-✓ SOFR {sofr_actual:.2f}% dentro del rango {fed_lower:.2f}-{fed_upper:.2f}%"
+                        sofr_nota = f"✓ SOFR {sofr_actual:.2f}% dentro del rango {fed_lower:.2f}-{fed_upper:.2f}%"
             except:
                 sofr_nota = ""
             
@@ -351,15 +348,6 @@ def _fetch_fred_macro() -> dict:
         }
     else:
         out["cpi_yoy"] = _nd("Inflacion CPI")
-            "name":  "Inflación CPI",
-            "value": f"{yoy:.1f}% YoY",
-            "prev":  f"~{yoy_prv:.1f}% (mes ant.)",
-            "dir": d, "signal": s,
-            "note": f"Meta FED 2%  |  YoY: {yoy:.1f}% ({'↑ acelerando' if yoy_change > 0.15 else '↓ desacelerando' if yoy_change < -0.15 else '↔ estable'})",
-        }
-    else:
-        out["cpi_yoy"] = _nd("Inflación CPI")
-
     # ── NFP — Empleo No Agrícola (PAYEMS) ─────────────────────────────────────
     # PAYEMS está en miles de trabajadores; el diff mensual = variación NFP
     # Usar 3-month MA para evitar revisiones masivas (-50K típicamente 3 semanas después)
