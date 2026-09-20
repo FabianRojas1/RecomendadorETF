@@ -1199,8 +1199,8 @@ def _dibujar_checklist(ax, x, y, bloques, alto_linea=0.072):
 def _dibujar_tarjeta_ticker(fig, rec: dict, y_top: float, alto: float):
     """Dibuja la tarjeta de un activo dentro de la franja indicada de la figura."""
     ticker = rec.get("ticker", "—")
-    segmento = rec.get("asset_subtype", "") or rec.get("asset_type", "")
     nombre = rec.get("asset_name", "")
+    asset_type = rec.get("asset_type", "")
     lp     = rec.get("lp") or {}
     mp     = rec.get("mp") or {}
     comb   = rec.get("combinada") or {}
@@ -1215,11 +1215,14 @@ def _dibujar_tarjeta_ticker(fig, rec: dict, y_top: float, alto: float):
     ax_h.set_xlim(0, 1); ax_h.set_ylim(0, 1); ax_h.axis("off")
     ax_h.add_patch(mpatches.FancyBboxPatch((0, 0), 1, 1, boxstyle="square,pad=0",
                                            fc=color_acc, ec="none"))
-    ticker_display = f"{ticker} ({segmento})" if segmento else ticker
-    ax_h.text(0.015, 0.66, ticker_display, fontsize=15, fontweight="bold", color="white", va="center")
-    if nombre:
-        ax_h.text(0.015, 0.24, textwrap.shorten(nombre, width=58, placeholder="..."),
-                  fontsize=7.5, color="white", alpha=0.9, va="center")
+    # Formato: TICKER - Nombre (Tipo) o solo TICKER si no hay nombre
+    if nombre and asset_type:
+        ticker_display = f"{ticker} - {nombre} ({asset_type})"
+    elif nombre:
+        ticker_display = f"{ticker} - {nombre}"
+    else:
+        ticker_display = ticker
+    ax_h.text(0.015, 0.66, ticker_display, fontsize=13, fontweight="bold", color="white", va="center")
     ax_h.text(0.985, 0.68, f"LP: {lp.get('estado','—')}  ({lp.get('confianza_pct',0)}%)",
               fontsize=8.5, fontweight="bold", color="white", va="center", ha="right")
     ax_h.text(0.985, 0.28, f"MP: {mp.get('estado','—')}  ({mp.get('confianza_pct',0)}%)",
