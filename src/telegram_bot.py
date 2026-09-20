@@ -168,14 +168,11 @@ def _fmt_macro_news_summary(macro_news: list) -> str:
     """
     if not macro_news:
         return (
-            "📰 <b>NOTICIAS MACRO</b>
-
-"
+            "📰 <b>NOTICIAS MACRO</b>\n\n"
             "<i>No se encontraron noticias macro/geopolíticas importantes esta semana.</i>"
         )
     
-    lines = ["📰 <b>NOTICIAS MACRO DE LA SEMANA</b>
-"]
+    lines = ["📰 <b>NOTICIAS MACRO DE LA SEMANA</b>\n"]
     
     # Agrupar por impacto
     por_impacto = {'alto': [], 'medio': [], 'contexto': []}
@@ -216,8 +213,7 @@ def _fmt_macro_news_summary(macro_news: list) -> str:
         lines.append("")
     
     lines.append("<i>Lee y analiza por tu propia cuenta. Sin análisis de sentimiento del bot.</i>")
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 
 def _fmt_news_summary(recommendations: list) -> str:
