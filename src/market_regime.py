@@ -400,7 +400,6 @@ def _fetch_fred_macro() -> dict:
         s = "ALCISTA" if gr_now > 2.5 else ("BAJISTA" if gr_now < 1.5 else "NEUTRAL")
         
         # Detectar si es rápida, segunda o final lectura (basado en días desde cierre de trimestre)
-        from datetime import datetime
         last_gdp_date = df.index[-1].to_pydatetime() if hasattr(df, 'index') else datetime.now()
         days_since = (datetime.now() - last_gdp_date).days
         
