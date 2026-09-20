@@ -1,3 +1,4 @@
+import urllib.parse
 """
 telegram_bot.py — Envío de reportes a Telegram.
 
@@ -203,6 +204,10 @@ def _fmt_catalizadores_summary(regime_data: dict) -> str:
         if impacto:
             impacto_short = impacto[:120] + "..." if len(impacto) > 120 else impacto
             lines.append(f"  📈 Impacto: {impacto_short}")
+        # Agregar link de búsqueda
+        search_query = urllib.parse.quote(cat.get('titulo', 'noticia'))
+        search_url = f"https://www.google.com/search?q={search_query}"
+        lines.append(f"  🔗 <a href='{search_url}'>Buscar más info</a>")
         
         lines.append("")
     
