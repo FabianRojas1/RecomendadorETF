@@ -253,9 +253,34 @@ def evaluar_mp(v: dict) -> dict:
     det_soporte = (", ".join(n for n, _ in cercanos) if cercanos
                    else f"sin soporte dentro de 1 ATR ({tolerancia:,.2f})")
 
-    adx_ok = (s_adx > ADX_MIN_MP) if s_adx is not None else None
+    # ADX > 20 no basta: la pendiente (vs. 2 velas atras) y el DI dominante dicen si sirve.
+    #   ADX subiendo + DI+ dominante -> tendencia alcista ganando fuerza   -> vale
+    #   ADX bajando  + DI- dominante -> la correccion se esta agotando      -> vale
+    #   ADX bajando  + DI+ dominante -> la alcista se desinfla (a rango)    -> no vale
+    #   ADX subiendo + DI- dominante -> la caida esta acelerando            -> no vale
+    s_adx2 = _num(v.get("sem_adx_hace2"))
+    s_pdi  = _num(v.get("sem_plus_di"))
+    s_mdi  = _num(v.get("sem_minus_di"))
+    adx_lectura = ""
+    if s_adx is None:
+        adx_ok = None
+    elif s_adx <= ADX_MIN_MP:
+        adx_ok = False
+    elif s_adx2 is None or s_pdi is None or s_mdi is None:
+        adx_ok = True   # sin pendiente o DI: se usa solo el umbral, como antes
+        adx_lectura = "sin datos de pendiente/DI"
+    else:
+        subiendo = s_adx >= s_adx2
+        alcista = s_pdi > s_mdi
+        adx_ok = subiendo == alcista
+        adx_lectura = {(True, True): "alcista ganando fuerza", (False, False): "correccion agotandose",
+                       (False, True): "alcista perdiendo fuerza", (True, False): "caida acelerando"}[
+                           (subiendo, alcista)]
     if adx_ok is False and cerca_soporte:
-        notas.append(f"ADX {s_adx:.1f} lateral: valido solo para acumular, no para impulso.")
+        if s_adx <= ADX_MIN_MP:
+            notas.append(f"ADX {s_adx:.1f} lateral: valido solo para acumular, no para impulso.")
+        else:
+            notas.append(f"ADX {s_adx:.1f} sobre {ADX_MIN_MP:.0f} pero {adx_lectura}: la ubicacion no se da por buena.")
 
     # Stop sugerido segun el checklist: soporte - 2 x ATR semanal.
     # Se toma el soporte relevante mas alto que quede por debajo del precio;
@@ -267,8 +292,10 @@ def evaluar_mp(v: dict) -> dict:
 
     ubicacion = [
         _chk("Precio cerca de soporte (1 ATR semanal)", cerca_soporte, det_soporte),
-        _chk(f"ADX semanal > {ADX_MIN_MP:.0f}", adx_ok,
-             f"ADX {s_adx:.1f}" if s_adx is not None else "sin datos"),
+        _chk(f"ADX semanal > {ADX_MIN_MP:.0f} con pendiente a favor", adx_ok,
+             (f"ADX {s_adx:.1f} (hace 2 velas {s_adx2:.1f})" if s_adx2 is not None else f"ADX {s_adx:.1f}")
+             + (f", DI+ {s_pdi:.1f} / DI- {s_mdi:.1f}" if s_pdi is not None and s_mdi is not None else "")
+             + (f": {adx_lectura}" if adx_lectura else "") if s_adx is not None else "sin datos"),
     ]
     ubicacion_ok = _todos(ubicacion)
 

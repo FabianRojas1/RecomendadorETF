@@ -65,7 +65,8 @@ def main():
     t["SQZ color"] = [_color(hist.iloc[i], hist.iloc[i - 1]) if i else "—" for i in range(len(hist))]
     t["cierre>EMA10"] = t["cierre"] > t["EMA10"]
     t["OBV>EMA20"] = t["OBV"] > t["OBV_EMA20"]
-    t["ADX>20"] = t["ADX"] > 20
+    t["ADX hace2"] = t["ADX"].shift(2)
+    t["ADX ok"] = (t["ADX"] > 20) & ((t["ADX"] >= t["ADX hace2"]) == (t["+DI"] > t["-DI"]))
     t.index = t.index.strftime("%Y-%m-%d")
 
     pd.set_option("display.width", 200)
@@ -75,7 +76,9 @@ def main():
     print("\nADX = versión de TradingView 'ADX and DI for v4' (DI con suma de Wilder, ADX = media simple de DX, 14)")
     print("Gatillo MP (semanal) = [SQZ pasa de rojo_oscuro a verde  O  (cierre > EMA10 con SQZ fuera de rojo_claro)]"
           "  Y  [OBV > EMA20 o divergencia alcista]")
-    print("Ubicación MP        = precio a ≤ 1 ATR de EMA55s / EMA200s / mínimo de 12 semanas  Y  ADX > 20\n")
+    print("Ubicación MP        = precio a ≤ 1 ATR de EMA55s / EMA200s / mínimo de 12 semanas  Y  ADX > 20 con "
+          "pendiente a favor\n                      (ADX subiendo con +DI dominante, o ADX bajando con -DI dominante;"
+          " pendiente = ADX vs. 2 velas atrás)\n")
     analizar(ticker, loader)
 
 

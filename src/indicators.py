@@ -724,8 +724,12 @@ class IndicatorCalculator:
             v[f"{p}_adx"]      = self._ultimo(adx_data.get("adx"))
             v[f"{p}_plus_di"]  = self._ultimo(adx_data.get("plus_di"))
             v[f"{p}_minus_di"] = self._ultimo(adx_data.get("minus_di"))
+            # ADX de hace 2 velas cerradas: pendiente del ADX sin el ruido de una sola vela
+            serie_adx = adx_data.get("adx")
+            serie_adx = serie_adx.dropna() if serie_adx is not None else pd.Series(dtype=float)
+            v[f"{p}_adx_hace2"] = float(serie_adx.iloc[-3]) if len(serie_adx) >= 3 else None
         except Exception:
-            v[f"{p}_adx"] = v[f"{p}_plus_di"] = v[f"{p}_minus_di"] = None
+            v[f"{p}_adx"] = v[f"{p}_plus_di"] = v[f"{p}_minus_di"] = v[f"{p}_adx_hace2"] = None
 
         # Squeeze con los colores del checklist
         try:
