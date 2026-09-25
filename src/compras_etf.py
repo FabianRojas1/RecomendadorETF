@@ -32,7 +32,29 @@ logger = logging.getLogger(__name__)
 
 TAM_LOTE = 100          # acciones por peticion a Yahoo
 MIN_FILAS = 60          # mismo minimo que main.py para el portafolio
-MAX_CERCA = 10          # cuántas "cerca del gatillo" se muestran en el PDF
+# Topes del PDF: por más señales que haya, la sección nunca pasa de MAX_GATILLO + MAX_CERCA
+# tarjetas. Las que no caben salen como lista de tickers al final (nada se oculta).
+MAX_GATILLO = 10        # compras con LP + gatillo MP
+MAX_CERCA = 10          # las más cercanas al gatillo
+MAX_POR_CATEGORIA = 3   # diversidad: máximo por categoría en cada bloque (se relaja si faltan)
+
+
+def _seleccionar(filas: list, maximo: int) -> tuple[list, list]:
+    """Toma hasta `maximo` respetando el orden y el tope por categoría; si no se llena, completa sin tope."""
+    elegidas, por_cat = [], {}
+    for r in filas:
+        cat = r.get("categoria_universo") or "—"
+        if len(elegidas) < maximo and por_cat.get(cat, 0) < MAX_POR_CATEGORIA:
+            elegidas.append(r)
+            por_cat[cat] = por_cat.get(cat, 0) + 1
+    for r in filas:
+        if len(elegidas) >= maximo:
+            break
+        if r not in elegidas:
+            elegidas.append(r)
+    orden = {id(r): i for i, r in enumerate(filas)}
+    elegidas.sort(key=lambda r: orden[id(r)])
+    return elegidas, [r for r in filas if r not in elegidas]
 
 
 def _cercania_gatillo(v: dict, mp: dict) -> dict:
@@ -179,18 +201,26 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
     # su contador arranca de cero, como en el portafolio cuando cambia la señal).
     estado_senales.guardar({t: d for t, d in estado.items() if t in sobrevivientes_lp}, ruta, hoy)
 
+    # Orden de prioridad: LP en zona de compra (100%) primero, luego mejor puntaje de calidad;
+    # las especulativas (sin puntaje) quedan al final de su bloque.
     gatillo = sorted((r for r in compras if r["grupo"] == "gatillo"),
-                     key=lambda r: (-r["lp_conf"], -(r["calidad"] or 0), r["ticker"]))
-    cerca = sorted((r for r in compras if r["grupo"] == "cerca"), key=lambda r: r["cercania"]["orden"])
+                     key=lambda r: (-r["lp_conf"], r["calidad"] is None, -(r["calidad"] or 0), r["ticker"]))
+    cerca = sorted((r for r in compras if r["grupo"] == "cerca"),
+                   key=lambda r: (r["cercania"]["orden"], r["calidad"] is None, -(r["calidad"] or 0)))
     n_cerca_total = len(cerca)
-    compras = gatillo + cerca[:MAX_CERCA]
+    gatillo_pdf, resto_gatillo = _seleccionar(gatillo, MAX_GATILLO)
+    cerca_pdf, resto_cerca = _seleccionar(cerca, MAX_CERCA)
+    compras = gatillo_pdf + cerca_pdf
     meta = {"fecha": hoy.isoformat(), "fecha_universo": getattr(mod, "FECHA_UNIVERSO", "N/D"),
             "etfs": [c["ETF"] for c in getattr(mod, "COBERTURA", [])],
             "cobertura": getattr(mod, "COBERTURA", []),
             "universo": len(universo), "excluidas_portafolio": len(universo) - len(tickers),
             "evaluadas": n_datos, "sin_datos": n_sin_datos, "pasan_lp": n_lp,
             "compras_total": n_compra_total, "con_gatillo": len(gatillo),
-            "cerca_total": n_cerca_total, "cerca_mostradas": min(n_cerca_total, MAX_CERCA),
+            "cerca_total": n_cerca_total, "cerca_mostradas": len(cerca_pdf),
+            "gatillo_mostradas": len(gatillo_pdf),
+            "resto_gatillo": [r["ticker"] for r in resto_gatillo],
+            "resto_cerca": [r["ticker"] for r in resto_cerca][:30],
             "compras": len(compras)}
     logger.info("Compras ETF: %d evaluadas · %d pasan LP · %d con gatillo · %d cerca del gatillo",
                 n_datos, n_lp, len(gatillo), n_cerca_total)
