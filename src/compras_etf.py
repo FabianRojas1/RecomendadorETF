@@ -32,7 +32,31 @@ logger = logging.getLogger(__name__)
 
 TAM_LOTE = 100          # acciones por peticion a Yahoo
 MIN_FILAS = 60          # mismo minimo que main.py para el portafolio
-ORDEN_ACCION = {"COMPRAR": 0, "COMPRAR (LP)": 1, "ENTRADA TACTICA": 2}
+MAX_CERCA = 10          # cuántas "cerca del gatillo" se muestran en el PDF
+
+
+def _cercania_gatillo(v: dict, mp: dict) -> dict:
+    """
+    Qué tan cerca está del gatillo MP una acción que ya tiene contexto y ubicación.
+    Solo ordena la lista del PDF; no cambia ninguna señal. Menor 'orden' = más cerca.
+      1. cuántos ítems del gatillo faltan (0-2)
+      2. SQZ semanal en rojo oscuro (bajista perdiendo fuerza: antesala del giro)
+      3. distancia del cierre a la EMA10 semanal, en ATR semanales
+    """
+    faltan = [i for i in (mp.get("gatillo") or []) if i.get("cumple") is not True]
+    close, e10, atr = v.get("sem_close"), v.get("sem_ema10"), v.get("sem_atr")
+    dist = max(0.0, (e10 - close) / atr) if close and e10 and atr else 9.9
+    rojo_oscuro = v.get("sem_sqz_color") == "rojo_oscuro"
+    textos = []
+    for i in faltan:
+        if i["item"].startswith("SQZ") and e10:
+            textos.append(f"cierre sobre EMA10 sem. ${e10:,.2f} (a {dist:.1f} ATR)")
+        elif i["item"].startswith("OBV"):
+            textos.append("OBV sobre su EMA20")
+        else:
+            textos.append(i["item"])
+    return {"orden": (len(faltan), 0 if rojo_oscuro else 1, dist), "faltan": textos,
+            "distancia_atr": round(dist, 2), "sqz_rojo_oscuro": rojo_oscuro}
 
 
 def cargar_universo():
@@ -90,7 +114,7 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
     ruta = ruta_estado(config)
     estado = estado_senales.cargar(ruta)
     sobrevivientes_lp = set()
-    n_datos = n_sin_datos = n_lp = 0
+    n_datos = n_sin_datos = n_lp = n_compra_total = 0
     compras = []
 
     for i in range(0, len(tickers), TAM_LOTE):
@@ -119,8 +143,20 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
                 categoria = lp_mp.ACCION_A_CATEGORIA.get(comb.get("accion", "SIN DATOS"), "MANTENER")
                 if "COMPRA" not in categoria:
                     continue
+                n_compra_total += 1
+                # En el PDF solo van: LP con gatillo MP (COMPRAR) y las más cercanas al gatillo
+                # (COMPRAR (LP) con MP al 60%: contexto y ubicación OK, falta solo el gatillo).
+                if comb["accion"] == "COMPRAR":
+                    grupo, cercania = "gatillo", None
+                elif comb["accion"] == "COMPRAR (LP)" and mp.get("confianza_pct") == 60:
+                    grupo, cercania = "cerca", _cercania_gatillo(v, mp)
+                else:
+                    continue
                 f = universo[t]
                 compras.append({
+                    "grupo": grupo, "cercania": cercania,
+                    "categoria_universo": f.get("categoria", ""), "etiqueta": f.get("etiqueta", ""),
+                    "calidad": f.get("calidad"), "riesgo": f.get("riesgo", ""),
                     "ticker": t, "empresa": f.get("empresa", t), "actividad": f.get("actividad", "N/D"),
                     "sector": f.get("sector", "N/D"), "pais": f.get("pais", "N/D"),
                     "tipo": " · ".join(p for p in (f.get("estilo"), f.get("tamano"), f.get("ciclo"))
@@ -143,11 +179,19 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
     # su contador arranca de cero, como en el portafolio cuando cambia la señal).
     estado_senales.guardar({t: d for t, d in estado.items() if t in sobrevivientes_lp}, ruta, hoy)
 
-    compras.sort(key=lambda r: (ORDEN_ACCION.get(r["accion"], 9), -r["mp_conf"], -r["lp_conf"], r["ticker"]))
+    gatillo = sorted((r for r in compras if r["grupo"] == "gatillo"),
+                     key=lambda r: (-r["lp_conf"], -(r["calidad"] or 0), r["ticker"]))
+    cerca = sorted((r for r in compras if r["grupo"] == "cerca"), key=lambda r: r["cercania"]["orden"])
+    n_cerca_total = len(cerca)
+    compras = gatillo + cerca[:MAX_CERCA]
     meta = {"fecha": hoy.isoformat(), "fecha_universo": getattr(mod, "FECHA_UNIVERSO", "N/D"),
             "etfs": [c["ETF"] for c in getattr(mod, "COBERTURA", [])],
             "cobertura": getattr(mod, "COBERTURA", []),
             "universo": len(universo), "excluidas_portafolio": len(universo) - len(tickers),
-            "evaluadas": n_datos, "sin_datos": n_sin_datos, "pasan_lp": n_lp, "compras": len(compras)}
-    logger.info("Compras ETF: %d evaluadas · %d pasan LP · %d con compra", n_datos, n_lp, len(compras))
+            "evaluadas": n_datos, "sin_datos": n_sin_datos, "pasan_lp": n_lp,
+            "compras_total": n_compra_total, "con_gatillo": len(gatillo),
+            "cerca_total": n_cerca_total, "cerca_mostradas": min(n_cerca_total, MAX_CERCA),
+            "compras": len(compras)}
+    logger.info("Compras ETF: %d evaluadas · %d pasan LP · %d con gatillo · %d cerca del gatillo",
+                n_datos, n_lp, len(gatillo), n_cerca_total)
     return {"compras": compras, "meta": meta}

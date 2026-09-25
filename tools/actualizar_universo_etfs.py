@@ -1,24 +1,24 @@
 """
-actualizar_universo_etfs.py - Escribe src/universo_etfs.py (lista FIJA de acciones).
+actualizar_universo_etfs.py - Escribe src/universo_etfs.py (lista FIJA de acciones de calidad).
 
 Se corre una vez, o cada trimestre tras los rebalanceos de los índices:
     python tools/actualizar_universo_etfs.py
 o desde GitHub: Actions -> "Actualizar universo ETF" -> Run workflow.
 
-Qué hace:
-  1. Baja los holdings de SP500, REMX, SOXX, QQQ, QTUM, BATT, XLV, MCHI, VXUS,
-     IWVL e ICLN (cada ETF con varias fuentes de respaldo).
-  2. Se queda con lo que cotiza en bolsa de EE.UU. (acciones de EE.UU. y ADRs,
-     cruzando con la lista de tickers de la SEC).
-  3. Baja la ficha de cada empresa (Yahoo) y arma: actividad en español
-     (minería, salud, aerolíneas…), país, sector, tipo de acción y descripción
-     (Groq si hay GROQ_API_KEY; si no, traducción automática).
-  4. Escribe todo como código en src/universo_etfs.py.
+Embudo:
+  Base    S&P 1500 + holdings de SP500/QQQ/SOXX/XLV (EE.UU.), VXUS/MCHI/IWVL (internacional),
+          REMX/BATT/QTUM/ICLN (temáticos) + lista LatAm. Solo lo que cotiza en NYSE/Nasdaq (ADRs incluidos).
+  Capa 1  Tamaño y liquidez: cap. ≥ 5.000 M USD (emergentes 2.000 M), volumen ≥ 20 M USD/día
+          (emergentes 5 M), precio ≥ 5 USD, ≥ 5 años cotizando.
+  Capa 2  Sello de índice: EE.UU. en el S&P 1500; resto en VXUS/MCHI/IWVL o lista LatAm.
+  Capa 3  Descarte: margen operativo < 0, FCF negativo 2 de 3 años, deuda neta/EBITDA > 3.5,
+          dilución > 5%/año, ingresos cayendo. Bancos/aseguradoras: ROE ≥ 12% en vez de FCF y deuda.
+  Capa 4  Puntaje 0-100 por categoría (rentabilidad, estabilidad del margen, crecimiento, balance);
+          se queda el mejor 50% (70% en Emergentes).
+  Aparte  Cupo "Especulativa" (máx. 40): en ETF temático, cap. ≥ 1.000 M, ingresos creciendo y caja
+          para 2 años de pérdidas.
 
-La corrida semanal (main.py) solo LEE ese archivo: no consulta estas páginas.
-Si un ETF sale "⚠ parcial", guarda sus holdings en data/holdings/<ETF>.csv
-(botón "Download holdings" del emisor) y vuelve a correr.
-
+La corrida semanal (main.py) solo LEE src/universo_etfs.py: no consulta estas páginas.
 Dependencias extra (solo para este script): requirements-universo.txt
 """
 import io
@@ -82,6 +82,8 @@ FONDOS = {
 # para que sepas si la cobertura fue completa o parcial.
 
 ETFS_REPORTE2 = ["SP500", "REMX", "SOXX", "QQQ", "QTUM", "BATT", "XLV", "MCHI", "VXUS", "IWVL", "ICLN"]
+# Índices que funcionan como "sello de calidad" (capa 2). SP400/SP600 completan el S&P 1500.
+FUENTES_BASE = ETFS_REPORTE2 + ["SP400", "SP600"]
 CARPETA_HOLDINGS = str(RAIZ / "data" / "holdings")          # CSV manuales opcionales: holdings/SOXX.csv, holdings/VXUS.csv ...
 # La SEC pide un User-Agent con nombre y correo de contacto. Pon el tuyo.
 SEC_USER_AGENT = os.getenv("SEC_USER_AGENT", "RecomendadorETF contacto@ejemplo.com")
@@ -97,6 +99,8 @@ _ISH_UK = "https://www.ishares.com/uk/individual/en/products/{id}/x/150657557601
 FUENTES_ETF = {
     "SP500": [("wiki", ("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "Symbol"), "Wikipedia"),
               ("csv_local", str(RAIZ / "data" / "sp500_constituyentes.csv"), "CSV S&P 500 local")],
+    "SP400": [("wiki", ("https://en.wikipedia.org/wiki/List_of_S%26P_400_companies", "Symbol"), "Wikipedia (S&P 400)")],
+    "SP600": [("wiki", ("https://en.wikipedia.org/wiki/List_of_S%26P_600_companies", "Symbol"), "Wikipedia (S&P 600)")],
     "QQQ":   [("wiki", ("https://en.wikipedia.org/wiki/Nasdaq-100", "Ticker"), "Wikipedia (Nasdaq-100)"),
               ("stockanalysis", "qqq", "StockAnalysis (top 25)")],
     "SOXX":  [("csv_url", _ISH_US.format(id=239705, t="SOXX"), "iShares")],
@@ -661,6 +665,11 @@ def obtener_info(sym: str, reintentos=3) -> dict | None:
         "pe_fwd": _f(i.get("forwardPE")), "pb": _f(i.get("priceToBook")), "div": div,
         "crec_ingresos": _f(i.get("revenueGrowth")), "crec_utilidad": _f(i.get("earningsGrowth")),
         "resumen": i.get("longBusinessSummary") or "",
+        "precio": precio, "vol_prom": _f(i.get("averageVolume")) or _f(i.get("averageDailyVolume3Month")),
+        "primer_dia": _f(i.get("firstTradeDateEpochUtc")) or (
+            _f(i.get("firstTradeDateMilliseconds")) / 1000 if _f(i.get("firstTradeDateMilliseconds")) else None),
+        "margen_op": _f(i.get("operatingMargins")), "roe": _f(i.get("returnOnEquity")),
+        "deuda": _f(i.get("totalDebt")), "caja": _f(i.get("totalCash")), "ebitda": _f(i.get("ebitda")),
     }
 
 
@@ -790,55 +799,310 @@ def _ficha(a: dict, inf: dict | None, desc: str | None) -> dict:
             "descripcion": desc, "etfs": a["etfs"]}
 
 
-def actualizar_universo(etfs=ETFS_REPORTE2, hilos=4, ruta=ARCHIVO_UNIVERSO):
-    """Descarga UNA vez holdings + fichas y escribe universo_etfs.py con todo fijo."""
-    print("1/3 Holdings de cada ETF...")
-    activos, cobertura = construir_universo(etfs)
-    cache = {}
-    if Path(CACHE_FICHAS).exists():
-        cache = json.loads(Path(CACHE_FICHAS).read_text(encoding="utf-8"))
-        # La caché solo sirve para retomar una corrida cortada: fichas de más de 20 días se vuelven a pedir
-        limite = (pd.Timestamp.today() - pd.Timedelta(days=20)).date().isoformat()
-        cache = {t: d for t, d in cache.items() if str(d.get("_fecha", "")) >= limite}
-    pend = [a["ticker"] for a in activos if a["ticker"] not in cache]
-    print(f"2/3 Fichas de empresa: {len(activos)} acciones ({len(activos) - len(pend)} ya en caché)...")
+# =============================================================================
+# FILTRO DE CALIDAD (capas 1-4) — solo se corre al actualizar el universo
+# =============================================================================
+# Capa 1  Tamaño y liquidez: capitalización, volumen en USD, precio, historia.
+# Capa 2  Sello externo: EE.UU. -> S&P 1500 (el S&P exige utilidades para entrar);
+#         fuera de EE.UU. -> índice internacional (VXUS/IXUS, MCHI, IWVL) o lista LatAm.
+# Capa 3  Descarte duro de fundamentales (reglas propias para bancos/aseguradoras).
+# Capa 4  Puntaje 0-100 dentro de cada categoría y se queda el mejor tramo.
+# Aparte: cupo "Especulativa" para temas sin utilidades (tierras raras, litio, cuántica).
+
+INDICES_EEUU = {"SP500", "SP400", "SP600"}
+INDICES_INTL = {"VXUS", "MCHI", "IWVL"}
+TEMATICOS = {"REMX", "BATT", "QTUM", "ICLN"}
+
+# Países del MSCI Emerging Markets (+ Hong Kong, sede de muchas empresas chinas)
+PAISES_EM = {
+    "China", "Hong Kong", "Taiwan", "India", "South Korea", "Brazil", "Saudi Arabia", "South Africa",
+    "Mexico", "Indonesia", "Thailand", "Malaysia", "United Arab Emirates", "Poland", "Qatar", "Kuwait",
+    "Turkey", "Philippines", "Chile", "Greece", "Peru", "Hungary", "Czech Republic", "Colombia", "Egypt",
+    "Argentina",
+}
+# Negocio latinoamericano con sede en otro país (Yahoo les asigna la sede). Editable.
+LATAM_EM = {"MELI", "NU", "GLOB", "DLO", "STNE", "PAGS", "XP", "CPA", "BAP", "SCCO"}
+
+MINERIA = {"Other Industrial Metals & Mining", "Copper", "Gold", "Silver", "Other Precious Metals & Mining",
+           "Aluminum", "Uranium", "Steel", "Coking Coal"}
+DEFENSIVOS = {"Healthcare", "Consumer Defensive", "Utilities"}
+SECTORIALES = {"Energy", "Industrials", "Basic Materials"}
+CON_CRECIMIENTO = {"Consumer Cyclical", "Communication Services", "Financial Services"}
+
+# Umbrales (todos ajustables)
+CAP_MIN = {"general": 5e9, "Emergentes": 2e9, "Especulativa": 1e9}
+VOL_USD_MIN = {"general": 20e6, "Emergentes": 5e6, "Especulativa": 5e6}
+PRECIO_MIN = 5.0
+ANIOS_HISTORIA = 5
+DEUDA_EBITDA_MAX = 3.5
+DILUCION_MAX = 0.05          # crecimiento anual compuesto de acciones en circulación
+ROE_MIN_FINANCIERAS = 0.12
+CRECIMIENTO_MIN = 0.15       # para la categoría Crecimiento (consumo, comunicaciones, financieras)
+TRAMO = {"general": 0.50, "Emergentes": 0.70}   # se queda el mejor 50% (70% en emergentes)
+MAX_ESPECULATIVAS = 40
+
+
+def _categoria(inf: dict, tags: set, sym: str) -> str | None:
+    pais, sector, ind = inf.get("pais"), inf.get("sector"), inf.get("industria")
+    if pais in PAISES_EM or sym in LATAM_EM:
+        return "Emergentes"
+    if ind in MINERIA or (sector == "Basic Materials" and tags & {"REMX", "BATT"}):
+        return "Tierras raras y minería"
+    if sector == "Technology":
+        return "Tecnología"
+    if sector in DEFENSIVOS:
+        return "Defensivas"
+    if sector in SECTORIALES:
+        return "Sectoriales"
+    if sector in CON_CRECIMIENTO and (inf.get("crec_ingresos") or 0) >= CRECIMIENTO_MIN:
+        return "Crecimiento"
+    return None   # inmobiliario, bancos de EE.UU. sin crecimiento, etc.
+
+
+def obtener_estados(sym: str, reintentos=2) -> dict:
+    """Series anuales (más reciente primero) de ingresos, utilidad operativa, FCF, acciones y capital invertido."""
+    import yfinance as yf
+
+    def fila(df, nombres):
+        if df is None or getattr(df, "empty", True):
+            return []
+        for n in nombres:
+            if n in df.index:
+                return [x for x in (_f(v) for v in df.loc[n].tolist()) if x is not None][:4]
+        return []
+
+    for intento in range(reintentos):
+        try:
+            t = yf.Ticker(sym)
+            inc, cf, bs = t.income_stmt, t.cashflow, t.balance_sheet
+            return {"ingresos": fila(inc, ["Total Revenue", "Operating Revenue"]),
+                    "util_op": fila(inc, ["Operating Income", "EBIT"]),
+                    "fcf": fila(cf, ["Free Cash Flow"]),
+                    "acciones": fila(bs, ["Ordinary Shares Number", "Share Issued"]),
+                    "cap_invertido": fila(bs, ["Invested Capital"])}
+        except Exception:  # noqa: BLE001
+            time.sleep(2 * (intento + 1))
+    return {}
+
+
+def _cagr(serie: list) -> float | None:
+    """Crecimiento compuesto entre el dato más viejo y el más reciente (serie: reciente primero)."""
+    if len(serie) < 2 or serie[-1] is None or serie[-1] <= 0 or serie[0] is None or serie[0] <= 0:
+        return None
+    return (serie[0] / serie[-1]) ** (1 / (len(serie) - 1)) - 1
+
+
+def metricas(inf: dict, est: dict) -> dict:
+    ing, uop = est.get("ingresos") or [], est.get("util_op") or []
+    margenes = [u / i for u, i in zip(uop, ing) if i]
+    roic = None
+    if uop and est.get("cap_invertido") and est["cap_invertido"][0] > 0:
+        roic = uop[0] * (1 - 0.21) / est["cap_invertido"][0]
+    ebitda, deuda, caja = inf.get("ebitda"), inf.get("deuda"), inf.get("caja")
+    deuda_neta = (deuda - caja) if deuda is not None and caja is not None else None
+    ratio = None
+    if deuda_neta is not None and ebitda is not None:
+        ratio = (deuda_neta / ebitda) if ebitda > 0 else (0.0 if deuda_neta <= 0 else float("inf"))
+    return {"margen_op": inf.get("margen_op"), "roe": inf.get("roe"), "roic": roic,
+            "crec_3a": _cagr(ing), "dilucion": _cagr(est.get("acciones") or []),
+            "fcf": est.get("fcf") or [], "deuda_ebitda": ratio,
+            "estab_margen": (float(np.std(margenes)) if len(margenes) >= 3 else None)}
+
+
+def capa3(inf: dict, m: dict) -> tuple[bool, list, int]:
+    """(pasa, motivos de descarte, n.º de reglas que se pudieron verificar)."""
+    fallas, n = [], 0
+    financiera = inf.get("sector") == "Financial Services"
+    if m["crec_3a"] is not None:
+        n += 1
+        if m["crec_3a"] < 0:
+            fallas.append("ingresos cayendo a 3 años")
+    if m["dilucion"] is not None:
+        n += 1
+        if m["dilucion"] > DILUCION_MAX:
+            fallas.append(f"dilución {m['dilucion']:.0%}/año")
+    if financiera:   # bancos y aseguradoras: FCF y deuda/EBITDA no aplican
+        if m["roe"] is not None:
+            n += 1
+            if m["roe"] < ROE_MIN_FINANCIERAS:
+                fallas.append(f"ROE {m['roe']:.0%} < {ROE_MIN_FINANCIERAS:.0%}")
+        return not fallas, fallas, n
+    if m["margen_op"] is not None:
+        n += 1
+        if m["margen_op"] < 0:
+            fallas.append("margen operativo negativo")
+    if len(m["fcf"]) >= 2:
+        n += 1
+        if sum(1 for x in m["fcf"][:3] if x < 0) >= 2:
+            fallas.append("FCF negativo 2 de 3 años")
+    if m["deuda_ebitda"] is not None and inf.get("sector") != "Utilities":
+        n += 1
+        if m["deuda_ebitda"] > DEUDA_EBITDA_MAX:
+            fallas.append("deuda neta/EBITDA > 3.5")
+    return not fallas, fallas, n
+
+
+def especulativa_ok(inf: dict, m: dict, tags: set) -> bool:
+    """Cupo aparte para temas sin utilidades: debe estar en un ETF temático y tener caja para 2 años."""
+    if not tags & TEMATICOS:
+        return False
+    if (inf.get("cap") or 0) < CAP_MIN["Especulativa"] or _vol_usd(inf) < VOL_USD_MIN["Especulativa"]:
+        return False
+    if not ((inf.get("crec_ingresos") or 0) > 0 or (m["crec_3a"] or 0) > 0):
+        return False
+    fcf = m["fcf"][0] if m["fcf"] else None
+    return fcf is None or fcf >= 0 or (inf.get("caja") or 0) >= 2 * abs(fcf)
+
+
+def _vol_usd(inf: dict) -> float:
+    return (inf.get("vol_prom") or 0) * (inf.get("precio") or 0)
+
+
+def capa1(inf: dict, cat: str) -> bool:
+    clave = cat if cat in CAP_MIN else "general"
+    if (inf.get("cap") or 0) < CAP_MIN[clave] or _vol_usd(inf) < VOL_USD_MIN[clave]:
+        return False
+    if (inf.get("precio") or 0) < PRECIO_MIN:
+        return False
+    if inf.get("primer_dia"):
+        anios = (time.time() - inf["primer_dia"]) / (365.25 * 86400)
+        if anios < ANIOS_HISTORIA:
+            return False
+    return True
+
+
+def capa2(inf: dict, tags: set, sym: str) -> bool:
+    if inf.get("pais") == "United States":
+        return bool(tags & INDICES_EEUU)
+    return bool(tags & INDICES_INTL) or sym in LATAM_EM
+
+
+def puntaje(filas: list[dict]) -> None:
+    """Puntaje 0-100 por percentiles dentro de la categoría (se guarda en f['calidad'])."""
+    df = pd.DataFrame([{"rent": f["m"]["roic"] if f["m"]["roic"] is not None else f["m"]["roe"],
+                        "estab": -f["m"]["estab_margen"] if f["m"]["estab_margen"] is not None else None,
+                        "crec": f["m"]["crec_3a"],
+                        "balance": -f["m"]["deuda_ebitda"] if f["m"]["deuda_ebitda"] is not None else None}
+                       for f in filas], dtype=float)
+    pct = df.rank(pct=True)
+    for f, (_, r) in zip(filas, pct.iterrows()):
+        vals = [x for x in r.tolist() if not np.isnan(x)]
+        f["calidad"] = int(round(100 * sum(vals) / len(vals))) if vals else None
+
+
+def _descargar_en_paralelo(func, simbolos, cache, clave, hilos):
+    pend = [t for t in simbolos if clave not in cache.get(t, {})]
     for i in range(0, len(pend), 40):
         lote = pend[i:i + 40]
         with ThreadPoolExecutor(max_workers=hilos) as ex:
-            for t, inf in zip(lote, ex.map(obtener_info, lote)):
-                if inf is not None:
-                    cache[t] = {**inf, "_fecha": pd.Timestamp.today().date().isoformat()}
-        Path(CACHE_FICHAS).parent.mkdir(parents=True, exist_ok=True); Path(CACHE_FICHAS).write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
-        print(f"   {min(i + 40, len(pend))}/{len(pend)}")
-    sin_desc = {t: cache[t] for t in cache if cache[t].get("resumen") and not cache[t].get("desc_es")}
+            for t, res in zip(lote, ex.map(func, lote)):
+                if res:
+                    cache.setdefault(t, {})[clave] = res
+                    cache[t]["_fecha"] = pd.Timestamp.today().date().isoformat()
+        Path(CACHE_FICHAS).parent.mkdir(parents=True, exist_ok=True)
+        Path(CACHE_FICHAS).write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        print(f"   {clave}: {min(i + 40, len(pend))}/{len(pend)}")
+
+
+def actualizar_universo(hilos=4, ruta=ARCHIVO_UNIVERSO):
+    """Descarga UNA vez listas + fichas, aplica el filtro de calidad y escribe src/universo_etfs.py."""
+    print("1/5 Listas base (S&P 1500, ETFs internacionales y temáticos)...")
+    activos, cobertura = construir_universo(FUENTES_BASE)
+    por_sym = {a["ticker"]: a for a in activos}
+    for t in LATAM_EM:
+        por_sym.setdefault(t, {"ticker": t, "nombre": t, "etfs": "Lista LatAm", "sector_etf": None, "subind_etf": None})
+    tags = {t: {x.split()[0] for x in a["etfs"].split(", ")} for t, a in por_sym.items()}
+
+    cache = {}
+    if Path(CACHE_FICHAS).exists():
+        cache = json.loads(Path(CACHE_FICHAS).read_text(encoding="utf-8"))
+        limite = (pd.Timestamp.today() - pd.Timedelta(days=20)).date().isoformat()
+        cache = {t: d for t, d in cache.items() if str(d.get("_fecha", "")) >= limite}
+
+    print(f"2/5 Fichas de {len(por_sym)} empresas (capas 1 y 2)...")
+    _descargar_en_paralelo(obtener_info, list(por_sym), cache, "info", hilos)
+    conteo = {"base": len(por_sym)}
+    cand = []
+    for t in por_sym:
+        inf = cache.get(t, {}).get("info")
+        if not inf or inf.get("quote_type") not in (None, "EQUITY") or \
+                (inf.get("bolsa") and inf["bolsa"] not in BOLSAS_EEUU_YF):
+            continue
+        cat = _categoria(inf, tags[t], t)
+        tematica = bool(tags[t] & TEMATICOS)
+        if cat is None and not tematica:
+            continue
+        pasa1 = cat is not None and capa1(inf, cat)
+        if not pasa1 and not (tematica and capa1(inf, "Especulativa")):
+            continue
+        cand.append({"t": t, "cat": cat, "tags": tags[t], "pasa1": pasa1,
+                     "pasa2": cat is not None and pasa1 and capa2(inf, tags[t], t)})
+    conteo["capa1"] = sum(c["pasa1"] for c in cand)
+    conteo["capa2"] = sum(c["pasa2"] for c in cand)
+
+    print(f"3/5 Estados financieros de {len(cand)} candidatas (capas 3 y 4)...")
+    _descargar_en_paralelo(obtener_estados, [c["t"] for c in cand], cache, "estados", hilos)
+    calidad, especulativas = [], []
+    for c in cand:
+        inf = cache[c["t"]]["info"]
+        m = metricas(inf, cache[c["t"]].get("estados") or {})
+        ok3, fallas, n = capa3(inf, m) if c["pasa2"] else (False, ["fuera de índice"], 0)
+        c.update(m=m, fallas=fallas)
+        if c["pasa2"] and ok3 and n > 0:
+            c["etiqueta"] = "Calidad" if n >= 3 else "Datos parciales"
+            calidad.append(c)
+        elif c["cat"] in (None, "Tierras raras y minería", "Tecnología", "Sectoriales") and \
+                especulativa_ok(inf, m, c["tags"]):
+            c["etiqueta"], c["cat"] = "Especulativa", c["cat"] or "Especulativa"
+            especulativas.append(c)
+    conteo["capa3"] = len(calidad)
+
+    elegidas = []
+    for cat in sorted({c["cat"] for c in calidad}):
+        grupo = [c for c in calidad if c["cat"] == cat]
+        puntaje(grupo)
+        grupo.sort(key=lambda c: -(c["calidad"] if c["calidad"] is not None else -1))
+        tramo = TRAMO.get(cat, TRAMO["general"])
+        n_quedan = len(grupo) if len(grupo) <= 4 else max(1, int(np.ceil(len(grupo) * tramo)))
+        elegidas += grupo[:n_quedan]
+    conteo["capa4"] = len(elegidas)
+    especulativas.sort(key=lambda c: -(cache[c["t"]]["info"].get("cap") or 0))
+    especulativas = [c for c in especulativas if c["t"] not in {e["t"] for e in elegidas}][:MAX_ESPECULATIVAS]
+    for c in especulativas:
+        c["calidad"] = None
+    conteo["especulativas"] = len(especulativas)
+
+    finales = elegidas + especulativas
+    print(f"4/5 Descripciones en español de {len(finales)} empresas...")
+    sin_desc = {c["t"]: cache[c["t"]]["info"] for c in finales
+                if cache[c["t"]]["info"].get("resumen") and not cache[c["t"]].get("desc_es")}
     if sin_desc:
-        print(f"   Descripciones en español para {len(sin_desc)} empresas...")
         for t, d in describir(sin_desc).items():
             cache[t]["desc_es"] = d
         Path(CACHE_FICHAS).write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
 
-    universo, fuera = {}, []
-    for a in activos:
-        inf = cache.get(a["ticker"])
-        if inf and ((inf.get("quote_type") and inf["quote_type"] != "EQUITY")
-                    or (inf.get("bolsa") and inf["bolsa"] not in BOLSAS_EEUU_YF)):
-            fuera.append(a["ticker"])  # ETF/fondo, o no cotiza en bolsa de EE.UU.
-            continue
-        universo[a["ticker"]] = _ficha(a, inf, (inf or {}).get("desc_es"))
-    sin_ficha = [a["ticker"] for a in activos if a["ticker"] not in cache]
+    universo = {}
+    for c in sorted(finales, key=lambda c: (c["cat"], -(c["calidad"] or 0))):
+        inf = cache[c["t"]]["info"]
+        f = _ficha(por_sym[c["t"]], inf, cache[c["t"]].get("desc_es"))
+        f.update(categoria=c["cat"], etiqueta=c["etiqueta"], calidad=c["calidad"],
+                 riesgo="China: riesgo regulatorio/ADR" if inf.get("pais") in ("China", "Hong Kong") else "")
+        universo[c["t"]] = f
 
+    resumen = pd.Series([c["cat"] for c in finales]).value_counts().to_dict() if finales else {}
     hoy = pd.Timestamp.today().date()
-    texto = (f'"""Universo fijo del Reporte 2 — generado por actualizar_universo() el {hoy}.\n'
-             "Acciones de los ETFs que cotizan en bolsa de EE.UU. Puedes corregir descripciones a mano;\n"
-             'se sobrescribe la próxima vez que corras actualizar_universo()."""\n\n'
+    texto = (f'"""Universo fijo del Reporte 2 — generado por tools/actualizar_universo_etfs.py el {hoy}.\n'
+             "Acciones de calidad (y un cupo especulativo) que cotizan en bolsa de EE.UU. Puedes corregir\n"
+             'descripciones a mano; se sobrescribe la próxima vez que se actualice el universo."""\n\n'
              f"FECHA_UNIVERSO = {str(hoy)!r}\n\n"
+             f"FILTRO = {pprint.pformat({'conteo': conteo, 'por_categoria': resumen}, width=110, sort_dicts=False)}\n\n"
              f"COBERTURA = {pprint.pformat(cobertura.to_dict('records'), width=110, sort_dicts=False)}\n\n"
              f"UNIVERSO = {pprint.pformat(universo, width=110, sort_dicts=False)}\n")
     Path(ruta).write_text(texto, encoding="utf-8")
+    print(f"5/5 Escrito {ruta}")
+    print("   Embudo:", " -> ".join(f"{k} {v}" for k, v in conteo.items()))
+    print("   Por categoría:", resumen)
     return universo
-    print(f"3/3 Escrito {ruta}: {len(universo)} acciones · descartadas (no acción / no bolsa EE.UU.): {len(fuera)}"
-          f" · sin ficha de Yahoo (quedan con datos del ETF): {len(sin_ficha)}")
-    print(cobertura.to_string(index=False))
 
 
 if __name__ == "__main__":

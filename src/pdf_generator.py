@@ -1385,19 +1385,14 @@ def _make_mantener_page(mantener: list):
 
 
 
-# ── Última sección: compras en acciones individuales de los ETFs ──────────────
+# ── Última sección: compras en acciones individuales (universo de calidad) ────
 
-_ETF_ACCION_COLOR = {
-    "COMPRAR":         COLORS["COMPRA FUERTE"],
-    "COMPRAR (LP)":    "#2e7d32",
-    "ENTRADA TACTICA": "#6a7f00",
+_ETF_GRUPO = {
+    "gatillo": ("COMPRA — LP con respaldo en MP (gatillo dado)", COLORS["COMPRA FUERTE"]),
+    "cerca":   ("CERCA DEL GATILLO — LP en zona, MP al 60%", "#8a6d00"),
 }
-_ETF_ACCION_TXT = {
-    "COMPRAR":         "COMPRAR — LP con respaldo en MP",
-    "COMPRAR (LP)":    "COMPRAR (LP) — a la espera de gatillo MP",
-    "ENTRADA TACTICA": "ENTRADA TÁCTICA — solo MP, sin respaldo LP",
-}
-_ETF_POR_PAGINA = 11
+_ETF_ETIQUETA_COLOR = {"Calidad": "#1a7a1a", "Datos parciales": "#6a7f00", "Especulativa": "#b26a00"}
+_ETF_ALTO_FILA, _ETF_ALTO_SUB, _ETF_Y0, _ETF_Y_MIN = 0.0745, 0.032, 0.845, 0.055
 
 
 def _pct_txt(nivel, precio):
@@ -1407,81 +1402,108 @@ def _pct_txt(nivel, precio):
         return ""
 
 
+def _etf_encabezado(ax, meta, n_pag, total):
+    ax.add_patch(mpatches.FancyBboxPatch((0, 0.925), 1, 0.075, boxstyle="square,pad=0",
+                 fc=COLORS["COMPRA FUERTE"], ec="none"))
+    titulo = "SECCIÓN: COMPRAS EN ACCIONES INDIVIDUALES"
+    if total > 1:
+        titulo += f"  ({n_pag}/{total})"
+    ax.text(0.5, 0.968, titulo, ha="center", va="center", fontsize=15, fontweight="bold", color="white")
+    ax.text(0.5, 0.940, "Universo de calidad: S&P 1500 + ADRs de índices internacionales, con filtro de "
+            "fundamentales", ha="center", va="center", fontsize=7.5,
+            color="white", alpha=0.9)
+    if meta.get("error"):
+        return
+    ax.text(0.02, 0.910, f"Universo {meta.get('universo', 0):,} acciones (foto del {meta.get('fecha_universo', 'N/D')})"
+            f"  ·  pasan LP {meta.get('pasan_lp', 0):,}  ·  con gatillo MP {meta.get('con_gatillo', 0)}  ·  "
+            f"cerca del gatillo {meta.get('cerca_total', 0)} (se muestran {meta.get('cerca_mostradas', 0)})",
+            fontsize=7.2, color=COLORS["text_gray"], va="center")
+    ax.text(0.02, 0.898, "Misma lógica de la sección COMPRAS: LP decide si se tiene, MP decide cuándo. Aplica solo "
+            "si no has ingresado antes.\nTesis fundamental: confirmar manualmente.",
+            fontsize=7.2, color=COLORS["text_gray"], va="top", style="italic", linespacing=1.3)
+
+
+def _etf_tarjeta(ax, r, y):
+    alto = _ETF_ALTO_FILA
+    color = _ETF_GRUPO[r["grupo"]][1]
+    ax.add_patch(mpatches.FancyBboxPatch((0.01, y - alto + 0.004), 0.98, alto - 0.008,
+                 boxstyle="round,pad=0.002,rounding_size=0.006", fc="#fbfdfb", ec="#d9e6d9", lw=0.6))
+    ax.add_patch(mpatches.Rectangle((0.01, y - alto + 0.004), 0.006, alto - 0.008, fc=color, ec="none"))
+    ax.text(0.028, y - 0.013, r["ticker"], fontsize=10.5, fontweight="bold", color=color, va="center")
+    ax.text(0.115, y - 0.013, textwrap.shorten(r["empresa"], 46, placeholder="…"), fontsize=9,
+            fontweight="bold", color=COLORS["text_dark"], va="center")
+    etiqueta = r.get("etiqueta") or ""
+    derecha = etiqueta + (f"  ·  calidad {r['calidad']}/100" if r.get("calidad") is not None else "")
+    ax.text(0.98, y - 0.013, derecha, fontsize=7.4, fontweight="bold", va="center", ha="right",
+            color=_ETF_ETIQUETA_COLOR.get(etiqueta, COLORS["text_gray"]))
+    ax.text(0.028, y - 0.029, textwrap.shorten(
+            f"{r.get('categoria_universo') or '—'}  ·  {r['actividad']} ({r['sector']})  ·  {r['pais']}", 96,
+            placeholder="…"), fontsize=7.4, color=COLORS["text_dark"], va="center")
+    ax.text(0.98, y - 0.029, textwrap.shorten("ETFs: " + (r.get("etfs") or "—"), 34, placeholder="…"),
+            fontsize=6.6, color=COLORS["text_gray"], va="center", ha="right")
+    ax.text(0.028, y - 0.044, textwrap.shorten(r.get("descripcion") or "", 140, placeholder="…"),
+            fontsize=7, color=COLORS["text_gray"], va="center", style="italic")
+    inval, stop, precio = r.get("invalidacion"), r.get("stop_mp"), r["precio"]
+    linea = (f"Precio ${precio:,.2f}  ·  LP {r['lp_conf']}%  ·  MP {r['mp_conf']}%  ·  "
+             f"Invalidación LP {'$' + format(inval, ',.2f') if inval else '—'}{_pct_txt(inval, precio)}  ·  "
+             f"Stop MP {'$' + format(stop, ',.2f') if stop else '—'}{_pct_txt(stop, precio)}")
+    vig = r.get("vigencia") or {}
+    if vig.get("semanas"):
+        linea += f"  ·  activa hace {vig['semanas']} sem"
+    if r["grupo"] == "cerca" and r.get("cercania"):
+        linea = ("Falta: " + "; ".join(r["cercania"]["faltan"] or ["—"]) + f"  ·  Precio ${precio:,.2f}  ·  "
+                 f"Stop MP {'$' + format(stop, ',.2f') if stop else '—'}{_pct_txt(stop, precio)}")
+    # "\$" evita que matplotlib lea dos signos de dólar como una fórmula (mathtext)
+    ax.text(0.028, y - 0.059, textwrap.shorten(linea, 150, placeholder="…").replace("$", r"\$"), fontsize=6.9,
+            color=COLORS["text_dark"], va="center")
+    if r.get("riesgo"):
+        ax.text(0.98, y - 0.059, r["riesgo"], fontsize=6.6, color=COLORS["red"], va="center", ha="right")
+
+
 def _make_compras_etf_pages(datos: dict):
-    """Una o más páginas (11 acciones por hoja) con las compras en acciones de los ETFs."""
+    """Páginas finales: primero las compras con gatillo MP, luego las 10 más cercanas al gatillo."""
     compras = (datos or {}).get("compras") or []
     meta = (datos or {}).get("meta") or {}
-    paginas = [compras[i:i + _ETF_POR_PAGINA] for i in range(0, len(compras), _ETF_POR_PAGINA)] or [[]]
+
+    # Maquetación: subtítulo al empezar cada grupo; salto de página cuando no cabe.
+    paginas, actual, y, grupo_prev = [], [], _ETF_Y0, None
+    for r in compras:
+        necesita = _ETF_ALTO_FILA + (_ETF_ALTO_SUB if r["grupo"] != grupo_prev else 0)
+        if y - necesita < _ETF_Y_MIN:
+            paginas.append(actual); actual, y = [], _ETF_Y0
+            necesita = _ETF_ALTO_FILA + _ETF_ALTO_SUB
+            grupo_prev = None
+        if r["grupo"] != grupo_prev:
+            actual.append(("sub", r["grupo"], y)); y -= _ETF_ALTO_SUB; grupo_prev = r["grupo"]
+        actual.append(("fila", r, y)); y -= _ETF_ALTO_FILA
+    paginas.append(actual)
+
     figuras = []
-    for n_pag, bloque in enumerate(paginas, 1):
+    for n_pag, elementos in enumerate(paginas, 1):
         fig, ax = plt.subplots(figsize=(8.5, 11))
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
         fig.patch.set_facecolor("white")
-
-        ax.add_patch(mpatches.FancyBboxPatch((0, 0.925), 1, 0.075, boxstyle="square,pad=0",
-                     fc=COLORS["COMPRA FUERTE"], ec="none"))
-        titulo = "SECCIÓN: COMPRAS EN ACCIONES DE ETFs"
-        if len(paginas) > 1:
-            titulo += f"  ({n_pag}/{len(paginas)})"
-        ax.text(0.5, 0.968, titulo, ha="center", va="center", fontsize=15, fontweight="bold", color="white")
-        ax.text(0.5, 0.940, "Acciones de " + ", ".join(meta.get("etfs") or []) + " que cotizan en bolsa de EE.UU.",
-                ha="center", va="center", fontsize=7.5, color="white", alpha=0.9)
-
+        _etf_encabezado(ax, meta, n_pag, len(paginas))
         if meta.get("error"):
-            ax.text(0.5, 0.80, meta["error"], ha="center", va="center", fontsize=10, color=COLORS["text_gray"],
-                    wrap=True)
-            figuras.append(fig)
-            continue
-
-        resumen = (f"Universo {meta.get('universo', 0):,} acciones (foto del {meta.get('fecha_universo', 'N/D')})  ·  "
-                   f"evaluadas {meta.get('evaluadas', 0):,}  ·  pasan LP {meta.get('pasan_lp', 0):,}  ·  "
-                   f"con compra {meta.get('compras', 0)}  ·  ya en tu portafolio {meta.get('excluidas_portafolio', 0)}")
-        ax.text(0.02, 0.910, resumen, fontsize=7.2, color=COLORS["text_gray"], va="center")
-        ax.text(0.02, 0.898, "Misma lógica de la sección COMPRAS: LP decide si se tiene, MP decide cuándo. Aplica solo "
-                "si no has ingresado antes.\nTesis fundamental: confirmar manualmente.",
-                fontsize=7.2, color=COLORS["text_gray"], va="top", style="italic", linespacing=1.3)
-
-        if not bloque:
-            ax.text(0.5, 0.75, "Sin señales de compra en acciones de los ETFs esta semana.",
+            ax.text(0.5, 0.80, meta["error"], ha="center", va="center", fontsize=10, color=COLORS["text_gray"])
+        elif not compras:
+            ax.text(0.5, 0.75, "Sin compras con gatillo ni acciones cerca del gatillo esta semana.",
                     ha="center", va="center", fontsize=11, color=COLORS["text_gray"])
-
-        alto, y = 0.0745, 0.855
-        for r in bloque:
-            color = _ETF_ACCION_COLOR.get(r["accion"], COLORS["COMPRA DEBIL"])
-            ax.add_patch(mpatches.FancyBboxPatch((0.01, y - alto + 0.004), 0.98, alto - 0.008,
-                         boxstyle="round,pad=0.002,rounding_size=0.006", fc="#fbfdfb", ec="#d9e6d9", lw=0.6))
-            ax.add_patch(mpatches.Rectangle((0.01, y - alto + 0.004), 0.006, alto - 0.008, fc=color, ec="none"))
-            ax.text(0.028, y - 0.013, r["ticker"], fontsize=10.5, fontweight="bold", color=color, va="center")
-            ax.text(0.115, y - 0.013, textwrap.shorten(r["empresa"], 44, placeholder="…"), fontsize=9,
-                    fontweight="bold", color=COLORS["text_dark"], va="center")
-            ax.text(0.98, y - 0.013, _ETF_ACCION_TXT.get(r["accion"], r["accion"]), fontsize=7.6,
-                    fontweight="bold", color=color, va="center", ha="right")
-            ax.text(0.028, y - 0.029, textwrap.shorten(
-                    f"{r['actividad']} ({r['sector']})  ·  {r['pais']}  ·  {r['tipo']}", 92, placeholder="…"),
-                    fontsize=7.4, color=COLORS["text_dark"], va="center")
-            ax.text(0.98, y - 0.029, textwrap.shorten("ETFs: " + (r.get("etfs") or ""), 34, placeholder="…"),
-                    fontsize=6.6, color=COLORS["text_gray"], va="center", ha="right")
-            ax.text(0.028, y - 0.044, textwrap.shorten(r.get("descripcion") or "", 140, placeholder="…"),
-                    fontsize=7, color=COLORS["text_gray"], va="center", style="italic")
-            vig = r.get("vigencia") or {}
-            linea = (f"Precio ${r['precio']:,.2f}  ·  LP {r['lp_estado']} {r['lp_conf']}%  ·  "
-                     f"MP {r['mp_estado']} {r['mp_conf']}%  ·  "
-                     f"Invalidación LP {'$' + format(r['invalidacion'], ',.2f') if r.get('invalidacion') else '—'}"
-                     f"{_pct_txt(r.get('invalidacion'), r['precio'])}  ·  "
-                     f"Stop MP {'$' + format(r['stop_mp'], ',.2f') if r.get('stop_mp') else '—'}"
-                     f"{_pct_txt(r.get('stop_mp'), r['precio'])}")
-            if vig.get("semanas"):
-                linea += f"  ·  activa hace {vig['semanas']} sem"
-            ax.text(0.028, y - 0.059, linea, fontsize=7, color=COLORS["text_dark"], va="center")
-            y -= alto
-
-        if n_pag == len(paginas):
+        for tipo, obj, yy in elementos:
+            if tipo == "sub":
+                titulo, color = _ETF_GRUPO[obj]
+                n = sum(1 for r in compras if r["grupo"] == obj)
+                ax.text(0.015, yy - 0.016, f"{titulo}  ·  {n}", fontsize=9.5, fontweight="bold", color=color,
+                        va="center")
+            else:
+                _etf_tarjeta(ax, obj, yy)
+        if n_pag == len(paginas) and not meta.get("error"):
             parciales = [c.get("ETF") for c in meta.get("cobertura") or []
                          if "parcial" in str(c.get("Fuente", "")) or "SIN FUENTE" in str(c.get("Fuente", ""))]
-            pie = ("ETFs con lista parcial en la foto del universo: " + ", ".join(parciales) + ".  "
-                   if parciales else "")
-            pie += ("Extranjeras sin ADR en NYSE/Nasdaq quedan fuera.\nLista y fichas: src/universo_etfs.py "
-                    "(se refresca con el workflow 'Actualizar universo ETF').")
-            ax.text(0.02, 0.025, pie, fontsize=6.5, color=COLORS["text_gray"], va="center", linespacing=1.3)
+            pie = ("Listas parciales en la foto del universo: " + ", ".join(parciales) + ".  " if parciales else "")
+            pie += ("\nEtiquetas: Calidad = pasó los 4 filtros · Datos parciales = pasó con datos incompletos · "
+                    "Especulativa = cupo temático sin utilidades.\nUniverso y fichas: src/universo_etfs.py "
+                    "(workflow 'Actualizar universo ETF', trimestral).")
+            ax.text(0.02, 0.030, pie, fontsize=6.5, color=COLORS["text_gray"], va="center", linespacing=1.3)
         figuras.append(fig)
     return figuras
