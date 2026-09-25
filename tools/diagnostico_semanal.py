@@ -72,8 +72,9 @@ def main():
     pd.set_option("display.max_columns", 30)
     print(f"\n{ticker} — últimas {n} velas SEMANALES CERRADAS (fecha = cierre de la semana)\n")
     print(t.tail(n).round(2).to_string())
-    print("\nGatillo MP (semanal) = [SQZ pasa de rojo_oscuro a verde  O  cierre > EMA10]  Y  [OBV > EMA20 o "
-          "divergencia alcista]")
+    print("\nADX = versión de TradingView 'ADX and DI for v4' (DI con suma de Wilder, ADX = media simple de DX, 14)")
+    print("Gatillo MP (semanal) = [SQZ pasa de rojo_oscuro a verde  O  (cierre > EMA10 con SQZ fuera de rojo_claro)]"
+          "  Y  [OBV > EMA20 o divergencia alcista]")
     print("Ubicación MP        = precio a ≤ 1 ATR de EMA55s / EMA200s / mínimo de 12 semanas  Y  ADX > 20\n")
     analizar(ticker, loader)
 

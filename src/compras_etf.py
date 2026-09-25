@@ -69,10 +69,15 @@ def _cercania_gatillo(v: dict, mp: dict) -> dict:
     close, e10, atr = v.get("sem_close"), v.get("sem_ema10"), v.get("sem_atr")
     dist = max(0.0, (e10 - close) / atr) if close and e10 and atr else 9.9
     rojo_oscuro = v.get("sem_sqz_color") == "rojo_oscuro"
+    if v.get("sem_sqz_color") == "rojo_claro":
+        dist = max(dist, 1.0)   # con SQZ en rojo claro no está "a punto", aunque el precio esté cerca
     textos = []
     for i in faltan:
         if i["item"].startswith("SQZ") and e10:
-            textos.append(f"cierre sobre EMA10 sem. ${e10:,.2f} (a {dist:.1f} ATR)")
+            if close and close > e10:   # ya cerró sobre la EMA10: lo que falta es el SQZ
+                textos.append("SQZ semanal salga de rojo claro (o gire a verde)")
+            else:
+                textos.append(f"cierre sobre EMA10 sem. ${e10:,.2f} (a {dist:.1f} ATR)")
         elif i["item"].startswith("OBV"):
             textos.append("OBV sobre su EMA20")
         else:

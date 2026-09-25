@@ -273,14 +273,19 @@ def evaluar_mp(v: dict) -> dict:
     ubicacion_ok = _todos(ubicacion)
 
     # ── 3. Gatillo (semanal) ──────────────────────────────────────────────────
+    # Prioridad al SQZ: el giro de rojo oscuro a verde es gatillo por si solo; el cierre
+    # sobre la EMA10 solo cuenta si el SQZ semanal NO esta en rojo claro (bajista acelerando).
     sqz_gira   = (s_prev == "rojo_oscuro") and (s_color in VERDES)
     sobre_e10  = s_close > s_e10
-    g_precio   = bool(sqz_gira or sobre_e10)
+    sqz_veta   = s_color == "rojo_claro"
+    g_precio   = bool(sqz_gira or (sobre_e10 and not sqz_veta))
     det_gatillo = []
     if sqz_gira:
         det_gatillo.append("SQZ paso de rojo oscuro a verde")
-    if sobre_e10:
+    if sobre_e10 and not sqz_veta:
         det_gatillo.append(f"cierre {s_close:,.2f} sobre EMA10 {s_e10:,.2f}")
+    if sobre_e10 and sqz_veta and not sqz_gira:
+        det_gatillo.append(f"cierre {s_close:,.2f} sobre EMA10 {s_e10:,.2f}, pero SQZ en rojo claro: no cuenta")
     if not det_gatillo:
         det_gatillo.append(f"SQZ {s_color} y cierre bajo EMA10")
 
@@ -292,7 +297,7 @@ def evaluar_mp(v: dict) -> dict:
                "OBV bajo su EMA20")
 
     gatillo = [
-        _chk("SQZ gira a verde o cierre sobre EMA10 semanal", g_precio,
+        _chk("SQZ gira a verde, o cierre sobre EMA10 semanal con SQZ fuera de rojo claro", g_precio,
              " | ".join(det_gatillo)),
         _chk("OBV sobre su EMA20 o divergencia alcista", g_obv, det_obv),
     ]

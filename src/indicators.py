@@ -318,9 +318,53 @@ class IndicatorCalculator:
     # ADX extendido con cruce DI
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _adx_tradingview(high, low, close, length: int = 14) -> pd.DataFrame:
+        """
+        ADX y DI igual que el indicador de TradingView "ADX and DI for v4" (el que usa el
+        usuario en sus gráficos):
+          - TR y movimientos direccionales suavizados con la suma de Wilder:
+                S[t] = S[t-1] - S[t-1] / length + valor[t]
+          - DI+ / DI- = 100 * DM suavizado / TR suavizado
+          - DX = 100 * |DI+ - DI-| / (DI+ + DI-)
+          - ADX = media SIMPLE de DX en `length` velas   <- aquí difiere del ADX de Wilder
+            (pandas_ta / ADX nativo de TradingView), que usa una media exponencial y reacciona
+            más lento: con el ADX cayendo, el de Wilder se queda varios puntos más arriba.
+        Devuelve columnas ADX_<n>, DMP_<n>, DMN_<n> (mismo formato que pandas_ta.adx).
+        """
+        h = pd.to_numeric(high, errors="coerce").to_numpy(float)
+        l = pd.to_numeric(low, errors="coerce").to_numpy(float)
+        c = pd.to_numeric(close, errors="coerce").to_numpy(float)
+        n = len(c)
+        str_ = sdmp = sdmn = 0.0
+        dip = np.full(n, np.nan)
+        dim = np.full(n, np.nan)
+        for i in range(n):
+            if i == 0 or np.isnan(c[i - 1]):
+                tr, dmp, dmn = h[i] - l[i], 0.0, 0.0
+            else:
+                tr = max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1]))
+                up, down = h[i] - h[i - 1], l[i - 1] - l[i]
+                dmp = max(up, 0.0) if up > down else 0.0
+                dmn = max(down, 0.0) if down > up else 0.0
+            if np.isnan(tr):
+                continue
+            str_ = str_ - str_ / length + tr
+            sdmp = sdmp - sdmp / length + dmp
+            sdmn = sdmn - sdmn / length + dmn
+            if str_ > 0:
+                dip[i] = 100.0 * sdmp / str_
+                dim[i] = 100.0 * sdmn / str_
+        idx = close.index
+        dip_s, dim_s = pd.Series(dip, index=idx), pd.Series(dim, index=idx)
+        suma = dip_s + dim_s
+        dx = (100.0 * (dip_s - dim_s).abs() / suma.where(suma != 0)).fillna(0.0)
+        adx = dx.rolling(length).mean()
+        return pd.DataFrame({f"ADX_{length}": adx, f"DMP_{length}": dip_s, f"DMN_{length}": dim_s})
+
     def _calc_adx_extended(self, high, low, close) -> dict:
         try:
-            adx_df  = ta.adx(high, low, close, length=14)
+            adx_df  = self._adx_tradingview(high, low, close, length=14)
             if adx_df is None or adx_df.empty:
                 raise ValueError("empty")
             cols    = adx_df.columns.tolist()
