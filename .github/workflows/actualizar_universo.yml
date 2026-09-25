@@ -1,0 +1,53 @@
+name: Actualizar universo ETF
+
+# Reescribe src/universo_etfs.py: la lista FIJA de acciones de los ETFs de
+# referencia con su ficha (actividad, país, tipo, descripción). La corrida
+# semanal solo lee ese archivo. Se corre a mano (Run workflow) o cada trimestre.
+on:
+  workflow_dispatch:
+  schedule:
+    # Día 2 de enero, abril, julio y octubre, 07:00 Bogotá (12:00 UTC),
+    # después de los rebalanceos trimestrales de los índices
+    - cron: '0 12 2 1,4,7,10 *'
+
+jobs:
+  universo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt -r requirements-universo.txt
+
+      - name: Generar universo
+        env:
+          GROQ_API_KEY:   ${{ secrets.GROQ_API_KEY }}
+          # La SEC pide un User-Agent con contacto. Puedes definir el secreto SEC_USER_AGENT
+          # ("RecomendadorETF tu@correo.com"); si no, se usa el correo noreply de GitHub.
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT || format('RecomendadorETF {0}@users.noreply.github.com', github.repository_owner) }}
+        run: python tools/actualizar_universo_etfs.py
+
+      - name: Guardar universo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/universo_etfs.py
+          if git diff --staged --quiet; then
+            echo "Universo sin cambios."
+          else
+            git commit -m "chore: universo de acciones ETF $(date -u +%Y-%m-%d)"
+            git pull --rebase --autostash
+            git push
+          fi

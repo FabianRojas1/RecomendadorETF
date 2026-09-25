@@ -9,7 +9,8 @@ on:
 jobs:
   analisis:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 45 min: además del portafolio escanea ~1.000 acciones de los ETFs de referencia
+    timeout-minutes: 45
 
     # Necesario para que el bot pueda guardar el estado de las señales
     permissions:
@@ -48,6 +49,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/estado_senales.json
+          git add data/estado_senales_etf.json 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "Sin cambios en el estado de señales."
           else
