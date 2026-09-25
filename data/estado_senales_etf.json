@@ -926,7 +926,7 @@
   },
   "GNRC": {
     "desde": "2026-09-25",
-    "senal": "TENER|ENTRAR AHORA",
+    "senal": "TENER|ESPERAR GATILLO",
     "ultima_vez": "2026-09-25"
   },
   "GOOG": {
@@ -1506,7 +1506,7 @@
   },
   "NOW": {
     "desde": "2026-09-25",
-    "senal": "VIGILAR|ENTRAR AHORA",
+    "senal": "VIGILAR|ESPERAR GATILLO",
     "ultima_vez": "2026-09-25"
   },
   "NRG": {
@@ -1876,7 +1876,7 @@
   },
   "SLB": {
     "desde": "2026-09-25",
-    "senal": "TENER|ENTRAR AHORA",
+    "senal": "TENER|ESPERAR GATILLO",
     "ultima_vez": "2026-09-25"
   },
   "SMCI": {
