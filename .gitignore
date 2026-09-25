@@ -7,3 +7,6 @@ __pycache__/
 .DS_Store
 *.pdf
 .pytest_cache/
+
+# Caché temporal de tools/actualizar_universo_etfs.py
+data/universo_fichas_cache.json

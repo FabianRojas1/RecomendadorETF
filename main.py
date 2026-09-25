@@ -36,6 +36,7 @@ from src              import estado_senales
 from src              import calendario
 from src              import ia_sintesis
 from src.regimen_cripto import indicadores_cripto
+from src                import compras_etf as compras_etf_mod
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -159,32 +160,8 @@ async def run_weekly_analysis():
             
 
             # Mapeo: conversión de acciones LP/MP a categorías de PDF
-
-            _accion_map = {
-
-                "VENTA TOTAL": "VENTA FUERTE",
-
-                "REDUCIR 50%": "VENTA DEBIL",
-
-                "RECORTE TACTICO": "VENTA DEBIL",
-
-                "COMPRAR": "COMPRA FUERTE",
-
-                "COMPRAR (LP)": "COMPRA DEBIL",
-
-                "ENTRADA TACTICA": "COMPRA DEBIL",
-
-                "MANTENER": "MANTENER",
-
-                "VIGILAR": "MANTENER",
-
-                "NO TENER": "VENTA FUERTE",
-
-                "SIN DATOS": "MANTENER",
-
-            }
-
-            action = _accion_map.get(accion_combinada, "MANTENER")
+            # (tabla única en signals.py, compartida con compras_etf.py)
+            action = lp_mp.ACCION_A_CATEGORIA.get(accion_combinada, "MANTENER")
 
             
 
@@ -261,6 +238,19 @@ async def run_weekly_analysis():
 
     portfolio_total = portfolio["current_value"].astype(float).sum()
 
+    # Última sección del PDF: compras en acciones individuales de los ETFs de
+    # referencia, con la misma lógica LP/MP. Si falla, el reporte sale igual.
+    compras_etf = None
+    try:
+        en_portafolio = set(portfolio["ticker"].astype(str)) | {
+            loader.get_yf_ticker(t) for t in portfolio["ticker"].astype(str)}
+        compras_etf = compras_etf_mod.analizar(
+            excluir=en_portafolio,
+            periodo=getattr(config, "HISTORY_PERIOD", None) or f"{config.HISTORY_DAYS}d",
+            config=config)
+    except Exception as e:
+        logger.error("Compras en acciones de ETFs: omitido (%s)", e)
+
     logger.info("Enviando reporte a Telegram (chat_id=%s)...", CHAT_ID[:6] + "***" if CHAT_ID else "VACÍO")
     # Obtener noticias macro de la semana
     macro_news = news_a.get_macro_news(days=7, max_results=10)
@@ -274,6 +264,7 @@ async def run_weekly_analysis():
         chat_id=CHAT_ID,
         regime_data=regime_data,
         macro_news=macro_news,
+        compras_etf=compras_etf,
     )
     if ok:
         logger.info("Reporte enviado a Telegram: OK")

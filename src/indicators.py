@@ -151,6 +151,27 @@ class IndicatorCalculator:
 
         return ind
 
+    # -------------------------------------------------------------------------
+    # Evaluacion por etapas (compras_etf.py): los MISMOS calculos de los marcos
+    # que hace calculate(), separados para no gastar el marco semanal en activos
+    # que el LP ya descarto. No toca calculate() ni el reporte del portafolio.
+    # -------------------------------------------------------------------------
+    def valores_lp(self) -> dict:
+        """Claves men_* que consume signals.evaluar_lp(), con el proxy de EMA200."""
+        v = self._frame_values(self._resample_ohlcv("ME"), "men")
+        v["men_ema200_proxy"] = False
+        if v.get("men_ema200") is None:
+            semanal = self._resample_ohlcv("W")
+            sem200 = self._ema_last(semanal["Close"], 200) if not semanal.empty else None
+            if sem200 is not None:
+                v["men_ema200"] = sem200
+                v["men_ema200_proxy"] = True
+        return v
+
+    def valores_mp(self) -> dict:
+        """Claves sem_* que consume signals.evaluar_mp() (junto con las men_*)."""
+        return self._frame_values(self._resample_ohlcv("W"), "sem")
+
     def get_current(self, ind: dict) -> dict:
         def last(s, default=None):
             try:

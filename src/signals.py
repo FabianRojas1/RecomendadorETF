@@ -468,6 +468,39 @@ def combinar(lp: dict, mp: dict, semanas_en_estado=None, tiene_posicion=False) -
             "avisos": avisos}
 
 
+# Conversion de la accion combinada a la categoria del PDF / Telegram.
+# Unica fuente: la usan main.py (portafolio) y compras_etf.py (acciones de ETFs).
+ACCION_A_CATEGORIA = {
+    "VENTA TOTAL":     "VENTA FUERTE",
+    "REDUCIR 50%":     "VENTA DEBIL",
+    "RECORTE TACTICO": "VENTA DEBIL",
+    "COMPRAR":         "COMPRA FUERTE",
+    "COMPRAR (LP)":    "COMPRA DEBIL",
+    "ENTRADA TACTICA": "COMPRA DEBIL",
+    "MANTENER":        "MANTENER",
+    "VIGILAR":         "MANTENER",
+    "NO TENER":        "VENTA FUERTE",
+    "SIN DATOS":       "MANTENER",
+}
+
+ESTADOS_MP = ("ENTRAR AHORA", "ESPERAR GATILLO", "SALIR", "MANTENER", "SIN DATOS")
+
+
+def lp_puede_comprar(lp: dict) -> bool:
+    """
+    Filtro de la etapa 1 (solo LP) para escanear muchos activos.
+
+    True si existe ALGUN estado de MP con el que combinar() terminaria en una
+    categoria de COMPRA. No repite las reglas: le pregunta a combinar() mismo,
+    asi que si las reglas cambian, el filtro cambia con ellas.
+    """
+    for e in ESTADOS_MP:
+        accion = combinar(lp, {"estado": e, "ventas": {}}, None, False)["accion"]
+        if "COMPRA" in ACCION_A_CATEGORIA.get(accion, ""):
+            return True
+    return False
+
+
 def evaluar(v: dict, semanas_en_estado=None, tiene_posicion=False) -> dict:
     """Punto de entrada unico: devuelve lp, mp y la recomendacion combinada."""
     lp = evaluar_lp(v)

@@ -393,6 +393,7 @@ async def send_weekly_report(
     chat_id: str,
     regime_data: dict = None,
     macro_news: list = None,
+    compras_etf: dict = None,
 ) -> bool:
     """
     Flujo completo del reporte semanal:
@@ -428,6 +429,7 @@ async def send_weekly_report(
             cop_usd_rate=cop_usd_rate,
             output_path=pdf_path,
             regime_data=regime_data,
+            compras_etf=compras_etf,
         )
 
         # 2. Enviar mensaje corto con señales fuertes
