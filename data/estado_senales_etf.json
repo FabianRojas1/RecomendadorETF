@@ -2,1116 +2,1116 @@
   "AA": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ABNB": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "ACMR": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ADI": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "ADP": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "ADSK": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "AEIS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "AGX": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "AIT": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ALB": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "AM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "AMAT": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "AME": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ANET": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "APH": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "APP": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "APPF": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "ATI": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "AWI": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "AYI": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "AZN": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "BCPC": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "BE": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "BHP": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "BJ": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "BKR": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "BX": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CAH": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "CBOE": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CCK": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CDE": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CDNS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "CGNX": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CHE": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ENTRAR AHORA",
+    "ultima_vez": "2026-09-27"
   },
   "CHRD": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "CI": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CINF": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "CL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CNC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "COKE": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "COR": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CORT": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "COST": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CPA": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CPRT": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CRS": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CRUS": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CSL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "CTAS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ENTRAR AHORA",
+    "ultima_vez": "2026-09-27"
   },
   "CVI": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "CVLT": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "CW": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "DAL": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "DASH": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "DCI": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "DDOG": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "DINO": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "DLB": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "DT": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "DXCM": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|ENTRAR AHORA",
+    "ultima_vez": "2026-09-27"
   },
   "EHC": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ELV": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "EME": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ENS": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ESTC": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|ENTRAR AHORA",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "EVR": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "EW": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "EXEL": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "EXLS": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "EXP": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FAST": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FCX": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FERG": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FIVE": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "FIX": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FORM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FSLR": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FSS": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "FTNT": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "GD": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "GE": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "GGG": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "GMED": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "GOOG": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "GOOGL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "GWW": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "HALO": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "HCA": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "HL": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "HOOD": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "HUM": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "HWM": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "IBKR": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "IDCC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "IDXX": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "IESC": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "INCY": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "INGR": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "INTC": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "IONQ": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "JKHY": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "JPM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "KLAC": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "KNSL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "KRYS": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "LAUR": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ENTRAR AHORA",
+    "ultima_vez": "2026-09-27"
   },
   "LECO": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "LGND": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "LLY": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "LMT": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "LNTH": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "LQDA": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "LRCX": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "LSTR": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MANH": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MATX": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "MCHP": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "MCK": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "MCO": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MDB": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MEDP": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "META": {
     "desde": "2026-09-25",
     "senal": "TENER|MANTENER",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MGY": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MLI": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MNST": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MOG-A": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MP": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MPWR": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MSA": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "MSM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MTSI": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "MUSA": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "NBIX": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "NET": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "NEU": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "NFG": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "NOC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "NOK": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "NTNX": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "NVDA": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "NVS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "NXPI": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ODFL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "OKTA": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ONC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ORCL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "OSK": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "P": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PATH": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "PAYC": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "PAYX": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "PBF": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "PCTY": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|ENTRAR AHORA",
+    "ultima_vez": "2026-09-27"
   },
   "PEN": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PEP": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PH": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PIPR": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PJT": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PLTR": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "POWL": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "PR": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "PSMT": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PSX": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "PTC": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "PTGX": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "QCOM": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "QLYS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "REGN": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "RGTI": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "RJF": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "RLI": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "RMBS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "RMD": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ROK": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ROKU": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "RRC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SAIA": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SAP": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|ENTRAR AHORA",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "SHEL": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SHW": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SITM": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SNA": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SNEX": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SNOW": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SPXC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SSD": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "STE": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "STM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "STRL": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SYK": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "SYY": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TECK": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TER": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TGT": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "THC": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TOST": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TPL": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TSEM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TSM": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TTC": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "TTEK": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "TWLO": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "TXN": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "UBER": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "UHS": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "VIGILAR|MANTENER",
+    "ultima_vez": "2026-09-27"
   },
   "UNH": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "UNP": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "UPS": {
     "desde": "2026-09-25",
     "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "UTHR": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "VAL": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "VEEV": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "VICR": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "VLO": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "VRT": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "VRTX": {
-    "desde": "2026-09-25",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-09-27"
   },
   "VST": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "WDC": {
     "desde": "2026-09-25",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "WMT": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "WST": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "WTS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   },
   "WWD": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "YOU": {
     "desde": "2026-09-25",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "ultima_vez": "2026-09-27"
   },
   "ZWS": {
-    "desde": "2026-09-25",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-25"
+    "desde": "2026-09-27",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-09-27"
   }
 }
