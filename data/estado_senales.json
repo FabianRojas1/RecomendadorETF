@@ -1,247 +1,247 @@
 {
   "AAPLCO": {
-    "desde": "2026-09-20",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "ACWI": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "AMZN": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "ARTY": {
-    "desde": "2026-09-19",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "ASML": {
-    "desde": "2026-09-19",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "BACCO": {
-    "desde": "2026-09-20",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "BATT": {
-    "desde": "2026-09-20",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "BKCH": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "BMRN": {
-    "desde": "2026-09-27",
-    "senal": "NO TENER|MANTENER",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "NO TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "BOTZ": {
-    "desde": "2026-09-19",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "BTC": {
-    "desde": "2026-09-20",
-    "senal": "TENER|MANTENER",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "CSPXCO": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "ENPH": {
     "desde": "2026-09-19",
     "senal": "NO TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "ETH": {
-    "desde": "2026-09-25",
-    "senal": "VIGILAR|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "GLD": {
     "desde": "2026-09-27",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "ICLN": {
     "desde": "2026-09-20",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "IDU": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "IEFA": {
-    "desde": "2026-09-27",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "IFRA": {
     "desde": "2026-09-20",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "ITA": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "IUESCO": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "IUFSCO": {
     "desde": "2026-09-20",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "IUITCO": {
     "desde": "2026-09-19",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "IWVLCO": {
     "desde": "2026-09-27",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "JNJ": {
-    "desde": "2026-09-27",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "LIT": {
-    "desde": "2026-09-19",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "MA": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "MCHI": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "MSFT": {
     "desde": "2026-09-20",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "NLR": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "PALL": {
-    "desde": "2026-09-19",
-    "senal": "VIGILAR|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "NO TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "PG": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "PSCE": {
-    "desde": "2026-09-27",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "PYPL": {
-    "desde": "2026-09-27",
-    "senal": "NO TENER|MANTENER",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "NO TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "QQQ": {
     "desde": "2026-09-19",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "QTUM": {
     "desde": "2026-09-27",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "REMX": {
-    "desde": "2026-09-19",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "NO TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "SDGR": {
-    "desde": "2026-09-19",
-    "senal": "NO TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "VIGILAR|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "SOXX": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "SPY": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "URA": {
     "desde": "2026-09-19",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "VDC": {
     "desde": "2026-09-27",
     "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "VEU": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "VT": {
     "desde": "2026-09-27",
     "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "ultima_vez": "2026-10-04"
   },
   "VWO": {
-    "desde": "2026-09-20",
-    "senal": "TENER|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|SALIR",
+    "ultima_vez": "2026-10-04"
   },
   "VYMI": {
-    "desde": "2026-09-19",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "WTAI": {
-    "desde": "2026-09-20",
-    "senal": "VIGILAR|ESPERAR GATILLO",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   },
   "XLMUSDT": {
-    "desde": "2026-09-19",
-    "senal": "NO TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "VIGILAR|ENTRAR AHORA",
+    "ultima_vez": "2026-10-04"
   },
   "XLV": {
-    "desde": "2026-09-19",
-    "senal": "TENER|SALIR",
-    "ultima_vez": "2026-09-27"
+    "desde": "2026-10-04",
+    "senal": "TENER|ESPERAR GATILLO",
+    "ultima_vez": "2026-10-04"
   }
 }
