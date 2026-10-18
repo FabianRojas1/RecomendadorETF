@@ -65,13 +65,21 @@ def generate_report_pdf(
             "axes.facecolor":   "white",
         })
 
-        # Tambien entran los gatillos confirmados y las ventas de semanas previas en
-        # seguimiento, aunque la accion de hoy sea otra (ver src/gatillo.py).
-        compras  = sorted([r for r in recommendations if "COMPRA" in r.get("action","")
-                           or (r.get("gatillo") or {}).get("estado") == "CONFIRMADO"],
+        # COMPRAS: accion de compra, o gatillo confirmado de semanas previas (nunca con
+        # accion de venta). VENTAS: solo posiciones que tienes (no se vende lo que no
+        # se tiene), con accion de venta o una venta previa en seguimiento sin accion
+        # de compra hoy. Asi ningun activo aparece con mensajes contrarios.
+        def _posee(r):
+            return (r.get("current_value_cop") or 0) > 0
+
+        compras  = sorted([r for r in recommendations if "COMPRA" in r.get("action", "")
+                           or ((r.get("gatillo") or {}).get("estado") == "CONFIRMADO"
+                               and "VENTA" not in r.get("action", ""))],
                           key=lambda x: -x.get("score", 0))
-        ventas   = sorted([r for r in recommendations if "VENTA"  in r.get("action","")
-                           or (r.get("senal_venta") or {}).get("estado") in ("CONFIRMADA", "NO CONFIRMADA")],
+        ventas   = sorted([r for r in recommendations if _posee(r) and (
+                               "VENTA" in r.get("action", "")
+                               or ((r.get("senal_venta") or {}).get("estado") in ("CONFIRMADA", "NO CONFIRMADA")
+                                   and "COMPRA" not in r.get("action", "")))],
                           key=lambda x:  x.get("score", 0))
         mantener = [r for r in recommendations if r.get("action","") == "MANTENER"]
 

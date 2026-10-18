@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import sys
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -39,6 +40,7 @@ from src.regimen_cripto import indicadores_cripto
 from src                import compras_etf as compras_etf_mod
 from src                import gatillo as gatillo_mod
 from src                import ordenes_hapi
+from src.pdf_generator  import generate_report_pdf
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -58,7 +60,13 @@ def _calc_stop_loss(price: float, action: str):
 
 # ── ANÁLISIS SEMANAL ──────────────────────────────────────────────────────────
 
-async def run_weekly_analysis():
+async def run_weekly_analysis(local: bool = False, sin_etf: bool = False):
+    """
+    local   : prueba en el PC. Guarda el PDF en output/, no envia nada a Telegram
+              y no escribe la memoria de señales (evita conflictos con los
+              commits semanales del bot).
+    sin_etf : omite la seccion de acciones de ETFs (~1.000 acciones, la mas lenta).
+    """
     """Descarga datos, calcula indicadores y envía reporte + PDF a Telegram."""
     logger.info("=== Iniciando análisis semanal ===")
 
@@ -186,6 +194,12 @@ async def run_weekly_analysis():
             # Mapeo: conversión de acciones LP/MP a categorías de PDF
             # (tabla única en signals.py, compartida con compras_etf.py)
             action = lp_mp.ACCION_A_CATEGORIA.get(accion_combinada, "MANTENER")
+            # El seguimiento de semanas previas no puede contradecir la accion de hoy:
+            # si hoy es compra no se muestra la venta pasada, y al reves.
+            if "COMPRA" in action:
+                seguimiento["venta"] = None
+            if "VENTA" in action:
+                seguimiento["compra"] = None
 
             
 
@@ -255,7 +269,9 @@ async def run_weekly_analysis():
         except Exception as e:
             logger.error("Error procesando %s: %s", ticker, e)
 
-    if estado_senales.guardar(estado_sen, ruta_estado):
+    if local:
+        logger.info("Modo local: no se guarda la memoria de señales")
+    elif estado_senales.guardar(estado_sen, ruta_estado):
         logger.info("Estado de señales guardado (%d activos)", len(estado_sen))
 
     if not recommendations:
@@ -268,14 +284,28 @@ async def run_weekly_analysis():
     # referencia, con la misma lógica LP/MP. Si falla, el reporte sale igual.
     compras_etf = None
     try:
+        if sin_etf:
+            raise RuntimeError("omitido con --sin-etf")
         en_portafolio = set(portfolio["ticker"].astype(str)) | {
             loader.get_yf_ticker(t) for t in portfolio["ticker"].astype(str)}
         compras_etf = compras_etf_mod.analizar(
             excluir=en_portafolio,
             periodo=getattr(config, "HISTORY_PERIOD", None) or f"{config.HISTORY_DAYS}d",
-            config=config)
+            config=config, guardar_estado=not local)
     except Exception as e:
         logger.error("Compras en acciones de ETFs: omitido (%s)", e)
+
+    if local:
+        ruta_pdf = os.path.join(config.BASE_DIR, "output",
+                                f"reporte_local_{datetime.now():%Y%m%d_%H%M}.pdf")
+        os.makedirs(os.path.dirname(ruta_pdf), exist_ok=True)
+        ok = generate_report_pdf(
+            recommendations=recommendations, portfolio_total_cop=portfolio_total,
+            cop_usd_rate=cop_rate, output_path=ruta_pdf, regime_data=regime_data,
+            compras_etf=compras_etf, liquidez_cop=liquidez_cop,
+            resumen_ordenes=ordenes_hapi.texto_resumen(ordenes_hapi.leer_resumen()))
+        logger.info("Modo local: PDF %s en %s", "generado" if ok else "NO generado", ruta_pdf)
+        return
 
     logger.info("Enviando reporte a Telegram (chat_id=%s)...", CHAT_ID[:6] + "***" if CHAT_ID else "VACÍO")
     # Obtener noticias macro de la semana
@@ -349,14 +379,22 @@ def main():
     parser = argparse.ArgumentParser(description="Recomendador de Inversiones ETF")
     parser.add_argument("--now",     action="store_true", help="Analisis semanal inmediato")
     parser.add_argument("--test",    action="store_true", help="Test de conectividad Telegram")
+    parser.add_argument("--local",   action="store_true",
+                        help="Prueba en el PC: PDF en output/, sin Telegram ni memoria de señales")
+    parser.add_argument("--sin-etf", action="store_true",
+                        help="Omite la seccion de acciones de ETFs (prueba rapida)")
     args = parser.parse_args()
+
+    if args.local:
+        asyncio.run(run_weekly_analysis(local=True, sin_etf=args.sin_etf))
+        return
 
     if not BOT_TOKEN or not CHAT_ID:
         logger.error("TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID son requeridos en .env o variables de entorno")
         sys.exit(1)
 
     if args.now:
-        asyncio.run(run_weekly_analysis())
+        asyncio.run(run_weekly_analysis(sin_etf=args.sin_etf))
     elif args.test:
         asyncio.run(run_test())
     else:

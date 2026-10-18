@@ -124,7 +124,8 @@ def _descargar_lote(tickers: list, periodo: str) -> dict:
     return out
 
 
-def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) -> dict:
+def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None,
+             guardar_estado: bool = True) -> dict:
     """
     Devuelve {"compras": [...], "meta": {...}} o {"compras": [], "meta": {"error": ...}}.
     excluir: tickers que ya estan en el portafolio (ya salen en la seccion COMPRAS).
@@ -210,7 +211,8 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
 
     # Memoria de señales: solo las que siguen pasando el LP (si una sale y vuelve,
     # su contador arranca de cero, como en el portafolio cuando cambia la señal).
-    estado_senales.guardar({t: d for t, d in estado.items() if t in sobrevivientes_lp}, ruta, hoy)
+    if guardar_estado:   # en la prueba local (--local) no se toca la memoria
+        estado_senales.guardar({t: d for t, d in estado.items() if t in sobrevivientes_lp}, ruta, hoy)
 
     # Orden de prioridad: LP en zona de compra (100%) primero, luego mejor puntaje de calidad;
     # las especulativas (sin puntaje) quedan al final de su bloque.

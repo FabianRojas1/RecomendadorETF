@@ -268,14 +268,25 @@ def _tasa_fed_desde_series(up, lo=None, sofr=None):
             break
         racha += 1
 
-    if prev is None:
-        cambio, signal = "Sin historia de 1 mes", "N/D"
-    elif ahora > prev + 1e-9:
-        cambio, signal = "↑ SUBIO el último mes", "BAJISTA"
-    elif ahora < prev - 1e-9:
-        cambio, signal = "↓ BAJO el último mes", "ALCISTA"
+    # Señal: decisiones de los ultimos 3 meses (~2 reuniones del FOMC, que se reune
+    # cada 6-7 semanas). Una ventana de 1 mes dejaba fuera la ultima decision casi
+    # siempre: una subida de hace 31 dias salia como "sin cambio".
+    recientes = dif[dif.index > ult_fecha - pd.DateOffset(months=3)]
+    antes_de = None   # (fecha de la ultima decision, rango previo a ella)
+    if len(recientes):
+        neto = float(recientes.sum())
+        sentido = neto if abs(neto) > 1e-9 else float(recientes.iloc[-1])
+        f_ult = recientes.index[-1]
+        previo = up[up.index < f_ult]
+        if len(previo):
+            antes_de = (f_ult, _rango(float(previo.iloc[-1]), previo.index[-1]))
+        verbo = "SUBIO" if sentido > 0 else "BAJO"
+        cambio = f"{'↑' if sentido > 0 else '↓'} {verbo} en los últimos 3 meses"
+        signal = "BAJISTA" if sentido > 0 else "ALCISTA"
+    elif prev is None:
+        cambio, signal = "Sin historia suficiente", "N/D"
     else:
-        cambio, signal = "↔ Sin cambio el último mes", "NEUTRAL"
+        cambio, signal = "↔ Sin cambios en los últimos 3 meses", "NEUTRAL"
 
     partes = [cambio]
     if len(dif):
@@ -304,7 +315,8 @@ def _tasa_fed_desde_series(up, lo=None, sofr=None):
     return {
         "name": "Tasa Fed (rango objetivo)",
         "value": rango,
-        "prev": f"{_rango(prev, base.index[-1])} (mes ant.)" if prev is not None else "—",
+        "prev": (f"{antes_de[1]} (antes del {antes_de[0].strftime('%d/%m')})" if antes_de
+                 else f"{_rango(prev, base.index[-1])} (mes ant.)" if prev is not None else "—"),
         "dir": "↑" if signal == "BAJISTA" else ("↓" if signal == "ALCISTA" else "↔"),
         "signal": signal,
         "note": nota,

@@ -53,7 +53,9 @@ def _fmt_strong_summary(recommendations: List[dict], portfolio_total: float, cop
 
     strong = [r for r in recommendations if _is_strong_signal(r)]
     compras = sorted([r for r in strong if "COMPRA" in r.get("action","")], key=lambda x: -x.get("score",0))
-    ventas  = sorted([r for r in strong if "VENTA"  in r.get("action","")], key=lambda x:  x.get("score",0))
+    # Solo se avisa venta de lo que se tiene (la Watchlist no tiene nada que vender)
+    ventas  = sorted([r for r in strong if "VENTA"  in r.get("action","")
+                      and (r.get("current_value_cop") or 0) > 0], key=lambda x:  x.get("score",0))
 
     lines = [
         f"<b>🔔 SEÑALES FUERTES — {fecha}</b>",
