@@ -37,6 +37,8 @@ from src              import calendario
 from src              import ia_sintesis
 from src.regimen_cripto import indicadores_cripto
 from src                import compras_etf as compras_etf_mod
+from src                import gatillo as gatillo_mod
+from src                import ordenes_hapi
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -66,6 +68,15 @@ async def run_weekly_analysis():
     news_a    = NewsAnalyzer(config)
     cop_rate  = loader.get_cop_usd_rate()
     portfolio = loader.load_portfolio()
+
+    # Valores en COP: las filas en USD (Hapi) se convierten con la TRM del momento
+    portfolio["current_value_cop"] = [
+        float(v or 0) * (cop_rate if str(c).upper() == "USD" else 1.0)
+        for v, c in zip(portfolio["current_value"], portfolio["currency"])
+    ]
+    # Liquidez (efectivo + CDT): se compara con la meta del 8% en el rebalanceo
+    liquidez_cop = float(portfolio.loc[portfolio["asset_type"].isin(["Efectivo", "Renta Fija"]),
+                                       "current_value_cop"].sum())
 
     logger.info("Tasa COP/USD: %.0f | Activos: %d", cop_rate, len(portfolio))
 
@@ -111,14 +122,23 @@ async def run_weekly_analysis():
     estado_sen  = estado_senales.cargar(ruta_estado)
 
     recommendations = []
-    for _, row in portfolio.iterrows():
+    for idx, row in portfolio.iterrows():
         ticker = row["ticker"]
+        if row.get("asset_type") in ("Efectivo", "Renta Fija"):
+            continue   # efectivo y CDT: no tienen precio de mercado ni señal
         try:
             df = loader.download_history(ticker)
 
             if df is None or df.empty or len(df) < 60:
                 logger.warning("%s: datos insuficientes, omitido", ticker)
                 continue
+
+            # Hapi: el valor sale de la cantidad por el precio de hoy (el CSV solo
+            # necesita cantidades al dia; las actualiza src/ordenes_hapi.py)
+            if (row.get("broker") == "Hapi" and str(row.get("currency")).upper() == "USD"
+                    and float(row.get("quantity") or 0) > 0):
+                portfolio.at[idx, "current_value_cop"] = (
+                    float(row["quantity"]) * float(df["Close"].iloc[-1]) * cop_rate)
 
             calc   = IndicatorCalculator(df)
             ind    = calc.calculate()
@@ -128,9 +148,13 @@ async def run_weekly_analysis():
             result = scorer.score(values, news)
 
             # Motor LP/MP (checklists de largo y mediano plazo)
-            tiene_posicion = float(row.get("current_value", 0) or 0) > 0
+            tiene_posicion = float(row.get("current_value_cop", 0) or 0) > 0
             lp_res = lp_mp.evaluar_lp(values)
             mp_res = lp_mp.evaluar_mp(values)
+            # Seguimiento de las señales MP de las 3 semanas previas: ¿el precio
+            # confirmo el ENTRAR AHORA o el SALIR? (ver src/gatillo.py)
+            seguimiento = gatillo_mod.evaluar(df, values, lp_res, mp_res,
+                                              tiene_posicion=tiene_posicion)
 
             # Cuanto lleva activa esta lectura (reinicia si cambia LP o MP)
             vigencia = estado_senales.actualizar(
@@ -208,7 +232,7 @@ async def run_weekly_analysis():
                 "news":             news[:5],
                 "squeeze_state":    values.get("squeeze_state", ""),
                 "adx_value":        values.get("adx") or 0,
-                "current_value_cop": float(row.get("current_value", 0)),
+                "current_value_cop": float(portfolio.at[idx, "current_value_cop"] or 0),
                 "pct_portfolio":    row.get("pct_of_total_portfolio", ""),
                 "asset_type":       row.get("asset_type", "Otro"),
                 "asset_subtype":    row.get("asset_subtype", ""),
@@ -216,6 +240,8 @@ async def run_weekly_analysis():
                 "mp":               senales["mp"],
                 "combinada":        senales["combinada"],
                 "vigencia":         vigencia,
+                "gatillo":          seguimiento["compra"],
+                "senal_venta":      seguimiento["venta"],
                 "catalizador":      catalizador,
             }
 
@@ -236,7 +262,7 @@ async def run_weekly_analysis():
         logger.error("Sin recomendaciones generadas. Abortando.")
         return
 
-    portfolio_total = portfolio["current_value"].astype(float).sum()
+    portfolio_total = float(portfolio["current_value_cop"].sum())
 
     # Última sección del PDF: compras en acciones individuales de los ETFs de
     # referencia, con la misma lógica LP/MP. Si falla, el reporte sale igual.
@@ -259,6 +285,8 @@ async def run_weekly_analysis():
     ok = await send_weekly_report(
         recommendations=recommendations,
         portfolio_total_cop=portfolio_total,
+        liquidez_cop=liquidez_cop,
+        resumen_ordenes=ordenes_hapi.texto_resumen(ordenes_hapi.leer_resumen()),
         cop_usd_rate=cop_rate,
         bot_token=BOT_TOKEN,
         chat_id=CHAT_ID,

@@ -40,7 +40,10 @@ _DIV_ES = {"bullish": "alcista", "bearish": "bajista", "none": "ninguna"}
 
 class IndicatorCalculator:
 
-    def __init__(self, df: pd.DataFrame):
+    def __init__(self, df: pd.DataFrame, asof=None):
+        # asof: fecha de referencia para decidir que velas ya cerraron. Por defecto
+        # hoy; al reevaluar una semana pasada se pasa esa fecha (ver gatillo.py).
+        self.asof = asof
         if df is None or df.empty or len(df) < MIN_DAILY_ROWS:
             raise ValueError(f"Datos insuficientes: {len(df) if df is not None else 0} filas")
         self.df = df.copy()
@@ -650,7 +653,8 @@ class IndicatorCalculator:
         if frame.empty:
             return frame
         try:
-            if pd.Timestamp(frame.index[-1]).date() > pd.Timestamp.today().date():
+            limite = self.asof or pd.Timestamp.today().date()
+            if pd.Timestamp(frame.index[-1]).date() > limite:
                 frame = frame.iloc[:-1]
         except Exception:
             pass

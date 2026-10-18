@@ -25,6 +25,7 @@ from datetime import date
 import pandas as pd
 
 from src import estado_senales
+from src import gatillo as gatillo_mod
 from src import signals as lp_mp
 from src.indicators import IndicatorCalculator
 
@@ -36,6 +37,7 @@ MIN_FILAS = 60          # mismo minimo que main.py para el portafolio
 # tarjetas. Las que no caben salen como lista de tickers al final (nada se oculta).
 MAX_GATILLO = 10        # compras con LP + gatillo MP
 MAX_CERCA = 10          # las más cercanas al gatillo
+MAX_CONFIRMADO = 10     # gatillo de semanas previas que el precio ya confirmo
 MAX_POR_CATEGORIA = 3   # diversidad: máximo por categoría en cada bloque (se relaja si faltan)
 
 
@@ -171,10 +173,13 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
                 if "COMPRA" not in categoria:
                     continue
                 n_compra_total += 1
-                # En el PDF solo van: LP con gatillo MP (COMPRAR) y las más cercanas al gatillo
-                # (COMPRAR (LP) con MP al 60%: contexto y ubicación OK, falta solo el gatillo).
+                seg = gatillo_mod.evaluar(df, v, lp, mp, tiene_posicion=False, hoy=hoy)["compra"]
+                # En el PDF van: LP con gatillo MP (COMPRAR), gatillos de semanas previas que el
+                # precio ya confirmo, y las más cercanas al gatillo (COMPRAR (LP) con MP al 60%).
                 if comb["accion"] == "COMPRAR":
                     grupo, cercania = "gatillo", None
+                elif seg and seg["estado"] == "CONFIRMADO":
+                    grupo, cercania = "confirmado", None
                 elif comb["accion"] == "COMPRAR (LP)" and mp.get("confianza_pct") == 60:
                     grupo, cercania = "cerca", _cercania_gatillo(v, mp)
                 else:
@@ -196,6 +201,7 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
                     "precio": float(df["Close"].iloc[-1]),
                     "invalidacion": lp.get("invalidacion"), "stop_mp": mp.get("stop_mp"),
                     "vigencia": vig,
+                    "gatillo": seg,
                 })
             except Exception as e:  # noqa: BLE001
                 logger.debug("%s: omitido (%s)", t, e)
@@ -210,12 +216,16 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
     # las especulativas (sin puntaje) quedan al final de su bloque.
     gatillo = sorted((r for r in compras if r["grupo"] == "gatillo"),
                      key=lambda r: (-r["lp_conf"], r["calidad"] is None, -(r["calidad"] or 0), r["ticker"]))
+    # Confirmados: primero los que menos se han alejado del precio de la señal
+    confirmado = sorted((r for r in compras if r["grupo"] == "confirmado"),
+                        key=lambda r: (r["gatillo"]["var_pct"], -r["lp_conf"], r["ticker"]))
     cerca = sorted((r for r in compras if r["grupo"] == "cerca"),
                    key=lambda r: (r["cercania"]["orden"], r["calidad"] is None, -(r["calidad"] or 0)))
     n_cerca_total = len(cerca)
     gatillo_pdf, resto_gatillo = _seleccionar(gatillo, MAX_GATILLO)
+    confirmado_pdf, resto_confirmado = _seleccionar(confirmado, MAX_CONFIRMADO)
     cerca_pdf, resto_cerca = _seleccionar(cerca, MAX_CERCA)
-    compras = gatillo_pdf + cerca_pdf
+    compras = gatillo_pdf + confirmado_pdf + cerca_pdf
     meta = {"fecha": hoy.isoformat(), "fecha_universo": getattr(mod, "FECHA_UNIVERSO", "N/D"),
             "etfs": [c["ETF"] for c in getattr(mod, "COBERTURA", [])],
             "cobertura": getattr(mod, "COBERTURA", []),
@@ -225,6 +235,8 @@ def analizar(excluir=(), periodo: str = "max", config=None, hoy: date = None) ->
             "cerca_total": n_cerca_total, "cerca_mostradas": len(cerca_pdf),
             "gatillo_mostradas": len(gatillo_pdf),
             "resto_gatillo": [r["ticker"] for r in resto_gatillo],
+            "confirmado_total": len(confirmado),
+            "resto_confirmado": [r["ticker"] for r in resto_confirmado][:30],
             "resto_cerca": [r["ticker"] for r in resto_cerca][:30],
             "compras": len(compras)}
     logger.info("Compras ETF: %d evaluadas · %d pasan LP · %d con gatillo · %d cerca del gatillo",

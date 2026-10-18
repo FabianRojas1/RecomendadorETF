@@ -8,6 +8,7 @@ Formato final:
   3. Alertas de precio: mensaje inmediato si movimiento > 5%
 """
 import asyncio
+import html
 import logging
 import os
 import tempfile
@@ -394,6 +395,8 @@ async def send_weekly_report(
     regime_data: dict = None,
     macro_news: list = None,
     compras_etf: dict = None,
+    liquidez_cop: float = 0.0,
+    resumen_ordenes: str = "",
 ) -> bool:
     """
     Flujo completo del reporte semanal:
@@ -430,10 +433,14 @@ async def send_weekly_report(
             output_path=pdf_path,
             regime_data=regime_data,
             compras_etf=compras_etf,
+            liquidez_cop=liquidez_cop,
+            resumen_ordenes=resumen_ordenes,
         )
 
         # 2. Enviar mensaje corto con señales fuertes
         summary_text = _fmt_strong_summary(recommendations, portfolio_total_cop, cop_usd_rate)
+        if resumen_ordenes:   # una linea dentro del mismo mensaje, no uno aparte
+            summary_text += "\n\n📥 " + html.escape(resumen_ordenes)
         await _send_message(bot, chat_id, summary_text)
         logger.info("Telegram: resumen de señales enviado")
 

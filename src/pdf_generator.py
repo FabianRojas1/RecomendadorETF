@@ -49,6 +49,8 @@ def generate_report_pdf(
     output_path: str,
     regime_data: dict = None,
     compras_etf: dict = None,
+    liquidez_cop: float = 0.0,
+    resumen_ordenes: str = "",
 ) -> bool:
     """
     Genera el PDF completo del reporte semanal usando matplotlib.
@@ -63,16 +65,21 @@ def generate_report_pdf(
             "axes.facecolor":   "white",
         })
 
-        compras  = sorted([r for r in recommendations if "COMPRA" in r.get("action","")],
+        # Tambien entran los gatillos confirmados y las ventas de semanas previas en
+        # seguimiento, aunque la accion de hoy sea otra (ver src/gatillo.py).
+        compras  = sorted([r for r in recommendations if "COMPRA" in r.get("action","")
+                           or (r.get("gatillo") or {}).get("estado") == "CONFIRMADO"],
                           key=lambda x: -x.get("score", 0))
-        ventas   = sorted([r for r in recommendations if "VENTA"  in r.get("action","")],
+        ventas   = sorted([r for r in recommendations if "VENTA"  in r.get("action","")
+                           or (r.get("senal_venta") or {}).get("estado") in ("CONFIRMADA", "NO CONFIRMADA")],
                           key=lambda x:  x.get("score", 0))
         mantener = [r for r in recommendations if r.get("action","") == "MANTENER"]
 
         with PdfPages(output_path) as pdf:
             # Portada
             pdf.savefig(_make_cover(recommendations, portfolio_total_cop, cop_usd_rate,
-                                    len(compras), len(ventas), len(mantener)),
+                                    len(compras), len(ventas), len(mantener),
+                                    resumen_ordenes=resumen_ordenes),
                         bbox_inches="tight")
             plt.close("all")
 
@@ -109,7 +116,7 @@ def generate_report_pdf(
             plt.close("all")
 
             # Sugerencia de rebalanceo (perfil agresivo)
-            pdf.savefig(_make_rebalancing_page(recommendations, portfolio_total_cop), bbox_inches="tight")
+            pdf.savefig(_make_rebalancing_page(recommendations, portfolio_total_cop, liquidez_cop), bbox_inches="tight")
             plt.close("all")
 
             # Distribución por horizonte (LP / MP) + señales accionables
@@ -118,7 +125,7 @@ def generate_report_pdf(
 
             # Sección COMPRAS
             if compras:
-                pdf.savefig(_make_section_header("COMPRAS", compras, COLORS["COMPRA FUERTE"]),
+                pdf.savefig(_make_section_header("COMPRAS", compras, COLORS["COMPRA FUERTE"], con_gatillo=True),
                             bbox_inches="tight")
                 plt.close("all")
                 for figura in _make_ticker_pages(compras):
@@ -127,7 +134,7 @@ def generate_report_pdf(
 
             # Sección VENTAS
             if ventas:
-                pdf.savefig(_make_section_header("VENTAS", ventas, COLORS["VENTA FUERTE"]),
+                pdf.savefig(_make_section_header("VENTAS", ventas, COLORS["VENTA FUERTE"], con_venta=True),
                             bbox_inches="tight")
                 plt.close("all")
                 for figura in _make_ticker_pages(ventas):
@@ -406,7 +413,7 @@ def _make_indicators_table_page(regime_data: dict):
     # ── Sección 2: Indicadores macro FRED ────────────────────────────────────
     _section_label([0.01, 0.718, 0.98, 0.026],
                    "  Indicadores macroeconómicos — FRED  "
-                   "(FEDFUNDS · CPIAUCSL · PAYEMS · GDP · UMCSENT · ICSA · NAPM)")
+                   "(DFEDTARU · SOFR · CPIAUCSL · PAYEMS · GDP · UMCSENT · ICSA · NAPM)")
 
     fred_keys = ["fed_rate", "cpi_yoy", "nfp", "gdp", "umich", "initial_claims", "ism_pmi"]
 
@@ -522,12 +529,16 @@ def _make_indicators_table_page(regime_data: dict):
 
             # Contenido (derecha), separado por una línea vertical
             ax_b.plot([0.25, 0.25], [0.12, 0.88], color=borde, linewidth=0.6, alpha=0.5)
-            ax_b.text(0.27, 0.72, textwrap.fill(cat.get("que_paso", ""), width=98)[:200],
-                      fontsize=7.2, color="#2a2a2a", va="top", linespacing=1.35)
-            ax_b.text(0.27, 0.34, textwrap.fill("Impacto: " + cat.get("impacto", ""),
-                                                width=98)[:200],
-                      fontsize=7.2, color="#333333", va="top", linespacing=1.35,
-                      fontweight="medium")
+            # Dos bloques con espacio propio: "que paso" arriba e "impacto" abajo,
+            # cada uno de maximo 2 lineas. Antes se encimaban y se cortaban a 200 caracteres.
+            que_paso = "\n".join(textwrap.wrap(cat.get("que_paso", "") or "—", width=110,
+                                              max_lines=2, placeholder="…"))
+            impacto  = "\n".join(textwrap.wrap("Impacto: " + (cat.get("impacto", "") or "—"),
+                                              width=110, max_lines=2, placeholder="…"))
+            ax_b.text(0.27, 0.93, que_paso, fontsize=7.2, color="#2a2a2a",
+                      va="top", linespacing=1.3)
+            ax_b.text(0.27, 0.50, impacto, fontsize=7.2, color="#333333",
+                      va="top", linespacing=1.3, fontweight="medium")
 
 
     # ── Footer ────────────────────────────────────────────────────────────────
@@ -537,7 +548,7 @@ def _make_indicators_table_page(regime_data: dict):
                     boxstyle="square,pad=0", fc="#f0f0f8", ec="none"))
     ax_ft.text(0.5, 0.72,
                "Señales de mercado: yfinance (^VIX · ^TNX · ^IRX · DX-Y.NYB · SPY)  |  "
-               "Macro FRED: FEDFUNDS · CPIAUCSL · PAYEMS · GDP · UMCSENT · ICSA · NAPM",
+               "Macro FRED: DFEDTARU · SOFR · CPIAUCSL · PAYEMS · GDP · UMCSENT · ICSA · NAPM",
                ha="center", va="center", fontsize=6.2, color="#777777")
     ax_ft.text(0.5, 0.26,
                "Catalizadores seleccionados cada semana por impacto esperado en el portafolio. "
@@ -624,14 +635,23 @@ def _make_holdings_table(recs: list, total_cop: float):
 
 
 # ── Perfil agresivo: targets y sugerencias ────────────────────────────────────
+# Objetivos como % del PATRIMONIO TOTAL (incluye efectivo y CDT). Suman 92%;
+# el 8% restante es la meta de efectivo, que va aparte.
 _AGRESIVO_TARGETS = {
-    "Crecimiento":     0.50,
-    "Defensiva":       0.15,
-    "Materias Primas": 0.08,
-    "Sectorial":       0.07,
-    "Cripto":          0.10,
-    "Emergentes":      0.10,
+    "Crecimiento":        0.45,
+    "Defensiva":          0.15,
+    "Materias Primas":    0.07,
+    "Sectorial":          0.07,
+    "Cripto":             0.10,
+    "Global ex-EE.UU.":   0.08,
 }
+
+# Cripto es techo: solo sugiere reducir si se pasa del objetivo, nunca comprar.
+_TECHO = {"Cripto"}
+
+# Liquidez objetivo (% del patrimonio total). Es una meta, no una banda: el
+# usuario decide si conviene estar por encima o por debajo segun el mercado.
+_CASH_TARGET_PCT = 8.0
 
 def _format_cop_delta(delta_cop: float) -> str:
     """Formatea un delta COP como etiqueta compacta, ej. '+~COP 2.5M' o '-~COP 340K'."""
@@ -642,7 +662,8 @@ def _format_cop_delta(delta_cop: float) -> str:
     return f"{sign}~COP {v/1_000:.0f}K"
 
 
-def _compute_rebal_suggestions(recs: list, type_totals: dict, total: float, threshold_pp: float = 2.0):
+def _compute_rebal_suggestions(recs: list, type_totals: dict, total: float, threshold_pp: float = 2.0,
+                               liquidez_cop: float = 0.0, patrimonio_cop: float = 0.0):
     """
     Genera sugerencias de rebalanceo de forma dinamica, cruzando:
       - La brecha entre asignacion actual y el objetivo por categoria (_AGRESIVO_TARGETS)
@@ -668,6 +689,8 @@ def _compute_rebal_suggestions(recs: list, type_totals: dict, total: float, thre
         target_pct = target_frac * 100
         diff_pp = actual_pct - target_pct
 
+        if cat in _TECHO and diff_pp <= 0:
+            continue   # techo: por debajo no hay nada que sugerir
         if abs(diff_pp) < threshold_pp:
             continue
 
@@ -696,10 +719,22 @@ def _compute_rebal_suggestions(recs: list, type_totals: dict, total: float, thre
             raw.append((best.get("ticker", "?"), accion, razon, delta_cop))
 
     raw.sort(key=lambda s: -abs(s[3]))
-    return [(t, a, r, _format_cop_delta(d)) for (t, a, r, d) in raw[:8]]
+
+    # Efectivo: se compara contra la meta, sin accion automatica. Va aparte del
+    # cupo de filas de las categorias.
+    cash_rows = []
+    if patrimonio_cop and patrimonio_cop > 0:
+        liq_pct = liquidez_cop / patrimonio_cop * 100
+        cash_rows.append(("EFECTIVO", "SEGUIMIENTO",
+                          f"Liquidez (efectivo + CDT) {liq_pct:.1f}% del patrimonio vs meta {_CASH_TARGET_PCT:.0f}%. "
+                          f"Sin banda fija: entrar o no lo decides tu segun el mercado.",
+                          f"{liq_pct - _CASH_TARGET_PCT:+.1f} pp"))
+
+    out = [(t, a, r, _format_cop_delta(d)) for (t, a, r, d) in raw[:8 - len(cash_rows)]]
+    return out + cash_rows
 
 
-def _make_rebalancing_page(recs: list, total_cop: float):
+def _make_rebalancing_page(recs: list, total_cop: float, liquidez_cop: float = 0.0):
     """
     Sugerencia de rebalanceo para perfil agresivo (arriesgado):
       - Grafica barras: asignacion actual vs objetivo
@@ -716,7 +751,7 @@ def _make_rebalancing_page(recs: list, total_cop: float):
     ax_h.text(0.5, 0.62, "Sugerencia de Rebalanceo - Perfil Agresivo",
               ha="center", va="center", fontsize=13, fontweight="bold", color="white")
     ax_h.text(0.5, 0.18,
-              "Objetivo: maximizar crecimiento con exposicion controlada a defensivos, materias primas, cripto y emergentes",
+              "Objetivo: maximizar crecimiento con exposicion controlada a defensivos, materias primas, cripto y exposicion global ex-EE.UU.",
               ha="center", va="center", fontsize=8, color="#ccaaff")
 
     # ── Calcular asignacion actual por tipo ───────────────────────────────────
@@ -733,20 +768,22 @@ def _make_rebalancing_page(recs: list, total_cop: float):
             # Poner en Sectorial si no clasificado
             type_totals["Sectorial"] = type_totals.get("Sectorial", 0) + type_totals.pop(extra_type)
 
-    total = sum(type_totals.values()) or total_cop or 1
+    # Porcentajes sobre el patrimonio total (efectivo y CDT incluidos)
+    total = total_cop or sum(type_totals.values()) or 1
 
-    categories = list(_AGRESIVO_TARGETS.keys())
-    actual_pcts  = [type_totals.get(c, 0) / total * 100 for c in categories]
-    target_pcts  = [_AGRESIVO_TARGETS[c] * 100 for c in categories]
+    categories  = list(_AGRESIVO_TARGETS.keys()) + ["Efectivo + CDT"]
+    actual_pcts = [type_totals.get(c, 0) / total * 100 for c in _AGRESIVO_TARGETS] \
+                  + [liquidez_cop / total * 100]
+    target_pcts = [_AGRESIVO_TARGETS[c] * 100 for c in _AGRESIVO_TARGETS] + [_CASH_TARGET_PCT]
 
     # ── Grafica barras ───────────────────────────────────────────────────────
     ax_b = fig.add_axes([0.08, 0.62, 0.88, 0.28])
     x = np.arange(len(categories))
     w = 0.35
     bars_act = ax_b.bar(x - w/2, actual_pcts, w, label="Actual",
-                        color=["#3366cc","#cc3333","#cc8833","#228833","#aa3388","#00aacc"], alpha=0.85, zorder=3)
+                        color=["#3366cc","#cc3333","#cc8833","#228833","#aa3388","#00aacc","#777777"], alpha=0.85, zorder=3)
     bars_tgt = ax_b.bar(x + w/2, target_pcts, w, label="Objetivo agresivo",
-                        color=["#99bbff","#ffaaaa","#ffcc88","#88dd88","#ddaadd","#aaeeff"], alpha=0.85,
+                        color=["#99bbff","#ffaaaa","#ffcc88","#88dd88","#ddaadd","#aaeeff","#cccccc"], alpha=0.85,
                         edgecolor="#555555", linewidth=0.8, zorder=3)
 
     ax_b.set_xticks(x)
@@ -820,7 +857,9 @@ def _make_rebalancing_page(recs: list, total_cop: float):
               fontsize=10, fontweight="bold", color=COLORS["text_dark"],
               va="top", transform=ax_t.transAxes)
 
-    rebal_suggestions = _compute_rebal_suggestions(recs, type_totals, total)
+    rebal_suggestions = _compute_rebal_suggestions(recs, type_totals, total,
+                                                   liquidez_cop=liquidez_cop,
+                                                   patrimonio_cop=total_cop)
 
     sug_data   = []
     sug_colors = []
@@ -836,6 +875,9 @@ def _make_rebalancing_page(recs: list, total_cop: float):
         if "VENDER" in accion or "REDUCIR" in accion:
             base_ticker_col = COLORS["VENTA FUERTE"]
             base_row_col    = "#fff0ec"
+        elif accion == "SEGUIMIENTO":
+            base_ticker_col = "#dddddd"   # efectivo: informativo, ni compra ni venta
+            base_row_col    = "#f5f5f5"
         else:
             base_ticker_col = COLORS["COMPRA FUERTE"]
             base_row_col    = "#f0fff0"
@@ -1078,7 +1120,7 @@ def _fecha_es(dt) -> str:
     return f"{_DIAS_ES[dt.weekday()]} {dt.day} de {_MESES_ES[dt.month]} de {dt.year}"
 
 
-def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant):
+def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant, resumen_ordenes: str = ""):
     fig, ax = plt.subplots(figsize=(8.5, 11))
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
     fig.patch.set_facecolor("white")
@@ -1117,6 +1159,10 @@ def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant):
         ax.text(x, 0.52, label, ha="center", va="center",
                 fontsize=9, color="white", transform=ax.transAxes)
 
+    if resumen_ordenes:
+        ax.text(0.5, 0.42, _sin_math(textwrap.fill(resumen_ordenes, 95)), ha="center", va="top",
+                fontsize=8.5, color=COLORS["text_dark"], transform=ax.transAxes, linespacing=1.4)
+
     ax.text(0.5, 0.05,
             "Este reporte es generado automáticamente. No constituye asesoría financiera.\n"
             "Siempre realiza tu propio análisis antes de tomar decisiones de inversión.",
@@ -1125,7 +1171,7 @@ def _make_cover(recs, total_cop, cop_rate, n_comp, n_vent, n_mant):
     return fig
 
 
-def _make_section_header(title, recs, color):
+def _make_section_header(title, recs, color, con_gatillo=False, con_venta=False):
     fig, ax = plt.subplots(figsize=(8.5, 4))
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
     fig.patch.set_facecolor("white")
@@ -1142,20 +1188,29 @@ def _make_section_header(title, recs, color):
     # porcentajes fijos (+8% / -5%) sin relacion con la estrategia. Aqui van los
     # niveles reales del checklist, los mismos que muestra cada tarjeta.
     col_labels = ["Ticker", "LP", "MP", "Precio USD", "Invalidación LP", "Stop MP"]
+    if con_gatillo:
+        col_labels.insert(3, "Gatillo MP")
+    elif con_venta:
+        col_labels.insert(3, "Señal de venta")
     rows = []
     for r in recs[:10]:
         lp = r.get("lp") or {}
         mp = r.get("mp") or {}
         inval = lp.get("invalidacion")
         stop  = mp.get("stop_mp")
-        rows.append([
+        fila = [
             r.get("ticker", ""),
             lp.get("estado", "—"),
             mp.get("estado", "—"),
             f"${r.get('price_usd', 0):.2f}",
             f"${inval:,.2f}" if inval else "—",
             f"${stop:,.2f}" if stop else "—",
-        ])
+        ]
+        if con_gatillo:
+            fila.insert(3, (r.get("gatillo") or {}).get("texto") or "—")
+        elif con_venta:
+            fila.insert(3, (r.get("senal_venta") or {}).get("texto") or "—")
+        rows.append(fila)
 
     if rows:
         tbl = ax.table(cellText=rows, colLabels=col_labels,
@@ -1272,6 +1327,20 @@ def _dibujar_tarjeta_ticker(fig, rec: dict, y_top: float, alto: float):
 
     # Avisos y motivos de venta, debajo de la columna izquierda
     extras = []
+    g = rec.get("gatillo")
+    if g:
+        extras.append("Gatillo MP " + g["texto"][0].lower() + g["texto"][1:] + (
+            ": el precio subio desde el ENTRAR AHORA de esa semana."
+            if g["estado"] == "CONFIRMADO" else
+            ": primera semana con ENTRAR AHORA; falta ver si el precio sube."))
+    sv = rec.get("senal_venta")
+    if sv:
+        extras.append("Señal de venta " + sv["texto"][0].lower() + sv["texto"][1:] + {
+            "ESTRUCTURAL":   ": cierre bajo EMA55 o stop de tesis; protege el capital.",
+            "NUEVA":         ": toma de ganancia; la confirmacion se vera las proximas semanas.",
+            "CONFIRMADA":    ": el precio cayo desde el SALIR; revisa el resto de la posicion.",
+            "NO CONFIRMADA": ": el precio siguio subiendo; la tendencia se mantiene.",
+        }.get(sv["estado"], ""))
     cat = rec.get("catalizador")
     if cat:
         extras.append("Catalizador activo — {}: {}".format(
@@ -1287,7 +1356,7 @@ def _dibujar_tarjeta_ticker(fig, rec: dict, y_top: float, alto: float):
     for linea in extras[:4]:
         if y_ex < 0.04:
             break
-        es_catalizador = linea.startswith("Catalizador activo")
+        es_catalizador = linea.startswith(("Catalizador activo", "Gatillo MP", "Señal de venta"))
         envuelto = textwrap.fill(
             textwrap.shorten(linea, width=128, placeholder="..."), width=62)
         ax_c.text(0.0, y_ex, "• " + envuelto,
@@ -1389,6 +1458,7 @@ def _make_mantener_page(mantener: list):
 
 _ETF_GRUPO = {
     "gatillo": ("COMPRA — LP con respaldo en MP (gatillo dado)", COLORS["COMPRA FUERTE"]),
+    "confirmado": ("GATILLO CONFIRMADO — subió desde el ENTRAR AHORA de las últimas 3 semanas", "#2a7a4a"),
     "cerca":   ("CERCA DEL GATILLO — LP en zona, MP al 60%", "#8a6d00"),
 }
 _ETF_ETIQUETA_COLOR = {"Calidad": "#1a7a1a", "Datos parciales": "#6a7f00", "Especulativa": "#b26a00"}
@@ -1467,6 +1537,9 @@ def _etf_tarjeta(ax, r, y):
              ("Stop MP", f"${stop:,.2f}{_pct_txt(stop, precio)}" if stop else "—"),
              ("Confianza", f"LP {r['lp_conf']}%  ·  MP {r['mp_conf']}%"),
              ("Señal activa", f"hace {vig['semanas']} sem." if vig.get("semanas") else "nueva esta semana")]
+    if r.get("gatillo"):
+        # En el grupo con gatillo, "confirmado / nuevo" dice mas que la antiguedad
+        filas[-1] = ("Gatillo MP", r["gatillo"]["texto"])
     yy = y - 0.048
     for k, v in filas:
         ax.text(0.675, yy, k, fontsize=8.4, color=COLORS["text_gray"], va="center")
@@ -1530,6 +1603,8 @@ def _make_compras_etf_pages(datos: dict):
             pie = ""
             if meta.get("resto_gatillo"):
                 pie += "También con gatillo (no caben en el tope): " + ", ".join(meta["resto_gatillo"]) + ".\n"
+            if meta.get("resto_confirmado"):
+                pie += "También con gatillo confirmado: " + ", ".join(meta["resto_confirmado"]) + ".\n"
             if meta.get("resto_cerca"):
                 pie += "También cerca del gatillo: " + ", ".join(meta["resto_cerca"]) + ".\n"
             pie += ("Listas parciales en la foto del universo: " + ", ".join(parciales) + ".  " if parciales else "")

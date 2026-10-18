@@ -14,7 +14,7 @@ Indicadores de mercado (yfinance):
   - SPY vs SMA200       → tendencia primaria del mercado
 
 Indicadores macroeconómicos (FRED via pandas_datareader):
-  - Tasa FED (FEDFUNDS)
+  - Tasa de la Fed (rango objetivo DFEDTARU/DFEDTARL; SOFR como confirmación)
   - Inflación CPI YoY (CPIAUCSL)
   - Empleo NFP (PAYEMS)
   - PIB EE.UU. (GDP)
@@ -214,6 +214,104 @@ def analyze_market_regime() -> dict:
 
 # ── FRED Macro indicators ─────────────────────────────────────────────────────
 
+def _tasa_fed_desde_series(up, lo=None, sofr=None):
+    """Resume la tasa de la Fed desde el rango objetivo.
+
+    up   : serie DFEDTARU (techo del rango objetivo, diaria, cambia solo en FOMC)
+    lo   : serie DFEDTARL (piso), opcional
+    sofr : serie SOFR (diaria, de mercado), opcional, solo como confirmación
+
+    Pura (sin red) para poder probarla. Retorna un dict con la forma de los
+    indicadores o None si no hay datos suficientes.
+    """
+    import pandas as pd
+
+    up = pd.Series(up).dropna().astype(float)
+    if len(up) < 2:
+        return None
+
+    lo_s = pd.Series(lo).dropna().astype(float) if lo is not None else None
+
+    ult_fecha = up.index[-1]
+    ahora = float(up.iloc[-1])
+    base = up[up.index <= ult_fecha - pd.DateOffset(months=1)]
+    prev = float(base.iloc[-1]) if len(base) else None
+
+    def _rango(techo, fecha):
+        if lo_s is None or not len(lo_s):
+            return f"{techo:.2f}%"
+        p = lo_s[lo_s.index <= fecha]
+        return f"{float(p.iloc[-1]):.2f}-{techo:.2f}%" if len(p) else f"{techo:.2f}%"
+
+    def _n(k, uno, varios):
+        return f"{k} {uno if k == 1 else varios}"
+
+    # Solo los días en que cambió la tasa (las series diarias repiten el valor)
+    dif = up.diff().dropna()
+    dif = dif[dif.abs() > 1e-9]
+
+    def _cuenta(meses):
+        corte = ult_fecha - pd.DateOffset(months=meses)
+        d = dif[dif.index > corte]
+        return int((d > 0).sum()), int((d < 0).sum())
+
+    s3, r3 = _cuenta(3)
+    s12, r12 = _cuenta(12)
+
+    # Racha: cambios consecutivos en la misma dirección, desde el más reciente
+    racha, sentido = 0, 0
+    for v in dif.iloc[::-1]:
+        sg = 1 if v > 0 else -1
+        if sentido == 0:
+            sentido = sg
+        if sg != sentido:
+            break
+        racha += 1
+
+    if prev is None:
+        cambio, signal = "Sin historia de 1 mes", "N/D"
+    elif ahora > prev + 1e-9:
+        cambio, signal = "↑ SUBIO el último mes", "BAJISTA"
+    elif ahora < prev - 1e-9:
+        cambio, signal = "↓ BAJO el último mes", "ALCISTA"
+    else:
+        cambio, signal = "↔ Sin cambio el último mes", "NEUTRAL"
+
+    partes = [cambio]
+    if len(dif):
+        partes.append(f"Último cambio {dif.index[-1].date().isoformat()} ({dif.iloc[-1] * 100:+.0f} pb)")
+    partes.append(f"Últimos 3m: {_n(s3, 'subida', 'subidas')} / {_n(r3, 'recorte', 'recortes')}")
+    partes.append(f"12m: {_n(s12, 'subida', 'subidas')} / {_n(r12, 'recorte', 'recortes')}")
+    if racha:
+        tipo = ("subida", "subidas") if sentido > 0 else ("recorte", "recortes")
+        partes.append(f"Racha: {_n(racha, *tipo)} {'seguida' if racha == 1 else 'seguidas'}")
+
+    # Nota corta: la tabla del PDF muestra solo ~46 caracteres
+    nota = f"3m {s3}↑ {r3}↓ · 12m {s12}↑ {r12}↓"
+    if len(dif):
+        nota = f"{dif.iloc[-1] * 100:+.0f}pb {dif.index[-1].strftime('%d/%m/%y')} · " + nota
+
+    rango = _rango(ahora, ult_fecha)
+
+    if sofr is not None:
+        s = pd.Series(sofr).dropna().astype(float)
+        if len(s):
+            s_now = float(s.iloc[-1])
+            sb = s[s.index <= s.index[-1] - pd.DateOffset(months=1)]
+            if len(sb):
+                partes.append(f"SOFR {s_now:.2f}% ({(s_now - float(sb.iloc[-1])) * 100:+.0f} pb vs mes ant.)")
+
+    return {
+        "name": "Tasa Fed (rango objetivo)",
+        "value": rango,
+        "prev": f"{_rango(prev, base.index[-1])} (mes ant.)" if prev is not None else "—",
+        "dir": "↑" if signal == "BAJISTA" else ("↓" if signal == "ALCISTA" else "↔"),
+        "signal": signal,
+        "note": nota,
+        "detalle": " | ".join(partes),
+    }
+
+
 def _fetch_fred_macro() -> dict:
     """
     Descarga indicadores macroeconómicos de FRED via pandas_datareader.
@@ -247,67 +345,24 @@ def _fetch_fred_macro() -> dict:
         return {"name": name, "value": "N/D", "prev": "—",
                 "dir": "—", "signal": "N/D", "note": note}
 
-    # -- Tasa FED (FEDFUNDS + SOFR como watchdog) -----------
-    # Estrategia: Signal basada en RANGO DE FEDFUNDS (cambios mes anterior vs actual)
-    #            SOFR es informativo (verifica si FEDFUNDS está actualizado)
+    # -- Tasa de la Fed: rango objetivo (DFEDTARU/DFEDTARL) + SOFR ---------------
+    # El rango objetivo cambia solo en las reuniones del FOMC: cada cambio es una
+    # decisión real. SOFR (diaria) se muestra como confirmación.
     fed_rate_fresco = None
-    
     try:
-        # FEDFUNDS: obtener últimos 3 meses para ver tendencia
-        df_fed = _fred("FEDFUNDS")
-        if df_fed is not None and len(df_fed) >= 3:
-            fed_now = float(df_fed.iloc[-1, 0])   # Mes actual
-            fed_1m = float(df_fed.iloc[-2, 0])    # Mes anterior
-            fed_2m = float(df_fed.iloc[-3, 0])    # Hace 2 meses
-            
-            # Determinar cambio de FEDFUNDS (política monetaria)
-            if fed_now > fed_1m + 0.10:
-                cambio = "↑ SUBIO"
-                signal_fed = "BAJISTA"
-            elif fed_now < fed_1m - 0.10:
-                cambio = "↓ BAJO"
-                signal_fed = "ALCISTA"
-            else:
-                cambio = "↔ Sin cambio"
-                signal_fed = "NEUTRAL"
-            
-            # Tendencia últimos 3 meses
-            if fed_2m > fed_now:
-                tendencia = "↓ bajista"
-            elif fed_2m < fed_now:
-                tendencia = "↑ alcista"
-            else:
-                tendencia = "→ estable"
-            
-            # Obtener SOFR para verificación (solo informativo)
-            sofr_nota = ""
-            try:
-                df_sofr = web.DataReader("SOFR", "fred", start=start)
-                if df_sofr is not None and len(df_sofr) >= 1:
-                    sofr_actual = float(df_sofr.iloc[-1, 0])
-                    fed_lower = fed_now - 0.125
-                    fed_upper = fed_now + 0.125
-                    if sofr_actual > fed_upper:
-                        sofr_nota = f"⚠️ REVISAR: SOFR {sofr_actual:.2f}% ARRIBA del rango {fed_lower:.2f}-{fed_upper:.2f}%"
-                    elif sofr_actual < fed_lower:
-                        sofr_nota = f"⚠️ REVISAR: SOFR {sofr_actual:.2f}% ABAJO del rango {fed_lower:.2f}-{fed_upper:.2f}%"
-                    else:
-                        sofr_nota = f"✓ SOFR {sofr_actual:.2f}% dentro del rango {fed_lower:.2f}-{fed_upper:.2f}%"
-            except:
-                sofr_nota = ""
-            
-            fed_rate_fresco = {
-                "name": "Tasa FED (FEDFUNDS)",
-                "value": f"{fed_now:.2f}%",
-                "prev": f"{fed_1m:.2f}% (mes ant.)",
-                "dir": "↑" if signal_fed == "BAJISTA" else ("↓" if signal_fed == "ALCISTA" else "↔"),
-                "signal": signal_fed,
-                "note": f"{cambio} | Tendencia 3m: {tendencia}{sofr_nota}",
-            }
-    except:
-        pass
-    
-    out["fed_rate"] = fed_rate_fresco if fed_rate_fresco else _nd("Tasa FED")
+        df_up = _fred("DFEDTARU")
+        if df_up is not None:
+            df_lo = _fred("DFEDTARL")
+            df_sofr = _fred("SOFR")
+            fed_rate_fresco = _tasa_fed_desde_series(
+                df_up.iloc[:, 0],
+                df_lo.iloc[:, 0] if df_lo is not None else None,
+                df_sofr.iloc[:, 0] if df_sofr is not None else None,
+            )
+    except Exception as e:
+        logger.debug("Tasa Fed: %s", e)
+
+    out["fed_rate"] = fed_rate_fresco if fed_rate_fresco else _nd("Tasa Fed (rango objetivo)")
 
     # -- Inflacion CPI YoY (CPIAUCSL) --------
     # Signal basada en TENDENCIA (aceleracion/desaceleracion), no nivel absoluto

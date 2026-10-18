@@ -175,6 +175,7 @@ def _construir_prompt(contexto: dict) -> str:
     lineas_acc = [f"- {s.get('name')}: {s.get('value')} ({s.get('signal')})"
                   for s in (acc.get("signals") or [])]
     lineas_macro = [f"- {d.get('name')}: {d.get('value')} (previo {d.get('prev')}, {d.get('dir')})"
+                    + (f" — {d['detalle']}" if d.get("detalle") else "")
                     for d in (acc.get("macro") or {}).values()
                     if d.get("value") not in (None, "N/D")]
     lineas_cri = [f"- {k}: {v}" for k, v in (cri.get("indicadores") or {}).items()]
@@ -436,6 +437,13 @@ _SINONIMOS = {
     "aranceles":       {"tariff", "tariffs", "trade"},
     "china":           {"china", "chinese", "brics", "emerging"},
     "emergentes":      {"emerging", "brics", "developing", "china"},
+    "europa":          {"europe", "european", "eurozone", "euro", "ecb"},
+    "eurozona":        {"europe", "eurozone", "euro", "ecb"},
+    "bce":             {"ecb", "euro", "eurozone"},
+    "asia":            {"asia", "asian", "japan", "china", "korea", "india", "taiwan"},
+    "japon":           {"japan", "japanese", "boj", "yen", "nikkei"},
+    "india":           {"india", "indian", "rupee"},
+    "corea":           {"korea", "korean", "kospi"},
     "cripto":          {"crypto", "bitcoin", "btc", "ethereum", "eth", "blockchain"},
     "tasas":           {"rate", "rates", "fed", "fomc", "treasury"},
     "inflacion":       {"inflation", "cpi", "hedge"},
@@ -444,6 +452,11 @@ _SINONIMOS = {
 }
 
 _ORDEN_RIESGO = {"alto": 0, "medio": 1, "bajo": 2}
+
+# Palabras que marcan un catalizador fuera de EE.UU. (emergentes, Europa, Asia)
+_FUERA_EEUU = {"china", "emerging", "brics", "developing",
+               "europe", "european", "eurozone", "ecb",
+               "asia", "asian", "japan", "boj", "yen", "korea", "india", "taiwan"}
 
 
 def _tokens(textos) -> set:
@@ -485,8 +498,8 @@ def catalizador_para_ticker(catalizadores, ticker, asset_type="", palabras_ticke
         if not coincide and cat.get("categoria") == "materias_primas" \
                 and asset_type == "Materias Primas":
             coincide = True
-        if not coincide and asset_type == "Emergentes" \
-                and ajenos & {"china", "emerging", "brics", "developing"}:
+        if not coincide and asset_type == "Global ex-EE.UU." \
+                and ajenos & _FUERA_EEUU:
             coincide = True
 
         if coincide:
