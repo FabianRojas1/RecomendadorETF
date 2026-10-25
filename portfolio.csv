@@ -11,13 +11,13 @@ NU,Nu Holdings,12.51417,0.0,,Hapi,USD,182.2,1.16%,Global ex-EE.UU.,Financiero La
 CB,Chubb Ltd.,0.44922,0.0,,Hapi,USD,161.62,1.03%,Defensiva,Financiero
 BKCH,Bitwise Crypto,2.8954,0.0,,Hapi,USD,161.12,1.02%,Crecimiento,Blockchain
 RTX,RTX Corp.,0.79391,0.0,,Hapi,USD,153.94,0.98%,Defensiva,Industrial
-DXCM,DexCom Inc.,1.71966,0.0,,Hapi,USD,147.95,0.94%,Crecimiento,Salud
+DXCM,DexCom Inc.,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Salud
 VWO,Vanguard FTSE Emerging Markets,1.95748,0.0,,Hapi,USD,113.59,0.72%,Global ex-EE.UU.,Mercados Emergentes
-LLY,Eli Lilly and Co.,0.08451,0.0,,Hapi,USD,106.24,0.67%,Crecimiento,Salud
-MCD,McDonald's Corp.,0.42236,0.0,,Hapi,USD,102.59,0.65%,Defensiva,Consumo Basico
-EME,EMCOR Group,0.13935,0.0,,Hapi,USD,100.49,0.64%,Sectorial,Industrial
-AVUV,Avantis U.S. Small Cap Value ETF,0.82484,0.0,,Hapi,USD,99.07,0.63%,Crecimiento,Valor Small Cap
-VXUS,Vanguard Total International Stock ETF,1.18528,0.0,,Hapi,USD,98.88,0.63%,Global ex-EE.UU.,Internacional
+LLY,Eli Lilly and Co.,0.16347,0.0,,Hapi,USD,206.23,0.67%,Crecimiento,Salud
+MCD,McDonald's Corp.,1.23744,0.0,,Hapi,USD,302.59,0.65%,Defensiva,Consumo Basico
+EME,EMCOR Group,0.0,0.0,,Watchlist,USD,0.0,0%,Sectorial,Industrial
+AVUV,Avantis U.S. Small Cap Value ETF,2.4799,0.0,,Hapi,USD,299.07,0.63%,Crecimiento,Valor Small Cap
+VXUS,Vanguard Total International Stock ETF,5.97627,0.0,,Hapi,USD,498.88,0.63%,Global ex-EE.UU.,Internacional
 JPM,JPMorgan Chase & Co.,0.29107,0.0,,Hapi,USD,98.88,0.63%,Defensiva,Financiero
 UBER,Uber Technologies,1.38642,0.0,,Hapi,USD,97.52,0.62%,Crecimiento,Tecnologia
 BX,Blackstone Inc.,0.84295,0.0,,Hapi,USD,89.89,0.57%,Crecimiento,Financiero
@@ -68,8 +68,11 @@ SDGR,Schrödinger Inc.,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Biotecnologia
 VDC,Vanguard Consumer Staples ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Defensiva,Consumo Basico
 VEU,Vanguard FTSE All-World ex-US ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Global ex-EE.UU.,Internacional
 VT,Vanguard Total World Stock,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Global
-VYMI,Vanguard International High Dividend Yield ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Global ex-EE.UU.,Dividendos
+VYMI,Vanguard International High Dividend Yield ETF,2.92775,102.4677,2026-10-21,Hapi,USD,300,0%,Global ex-EE.UU.,Dividendos
 XLMUSDT,Stellar Lumens,0.0,0.0,,Watchlist,USD,0.0,0%,Cripto,Crypto
 ITA,iShares U.S. Aerospace ETF,0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Tecnologia
 GLD,SPDR Gold Shares,0,0.0,,Watchlist,USD,0.0,0%,Materias Primas,Materias Primas
 BATT,Invesco Battery ETF,0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Baterias
+GD,General Dynamics Corporation,0.28899,346.0307,2026-10-21,Hapi,USD,100,,Sectorial,Industrial (auto)
+SNA,Snap-on Incorporated,0.2715,368.316,2026-10-21,Hapi,USD,100,,Sectorial,Industrial (auto)
+VST,Vistra Corp.,0.96056,156.1585,2026-10-21,Hapi,USD,150,,Defensiva,Servicios públicos (auto)

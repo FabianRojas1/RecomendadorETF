@@ -1,0 +1,65 @@
+{
+  "actualizado": "2026-10-25T13:30:49",
+  "procesadas": {
+    "1a1549bb38284668": {
+      "cantidad": 4.79099,
+      "fecha": "2026-10-19",
+      "operacion": "compra",
+      "ticker": "VXUS"
+    },
+    "1a15ec8fed477f90": {
+      "cantidad": 0.13935,
+      "fecha": "2026-10-21",
+      "operacion": "venta",
+      "ticker": "EME"
+    },
+    "1a15eca203ba8474": {
+      "cantidad": 1.71966,
+      "fecha": "2026-10-21",
+      "operacion": "venta",
+      "ticker": "DXCM"
+    },
+    "1a15eccb2659429f": {
+      "cantidad": 1.65506,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "AVUV"
+    },
+    "1a15f247c072d687": {
+      "cantidad": 0.28899,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "GD"
+    },
+    "1a15f24d7ba1a027": {
+      "cantidad": 0.2715,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "SNA"
+    },
+    "1a15f265cf8f0c8f": {
+      "cantidad": 2.92775,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "VYMI"
+    },
+    "1a15f26e42fb6db3": {
+      "cantidad": 0.96056,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "VST"
+    },
+    "1a15f27f778b5563": {
+      "cantidad": 0.81508,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "MCD"
+    },
+    "1a15f292f542a691": {
+      "cantidad": 0.07896,
+      "fecha": "2026-10-21",
+      "operacion": "compra",
+      "ticker": "LLY"
+    }
+  }
+}
