@@ -5,11 +5,11 @@ QQQ,Invesco QQQ Trust,2.23458,0.0,,Hapi,USD,1586.1,10.06%,Crecimiento,Tecnologia
 MA,Mastercard Inc.,0.9626,0.0,,Hapi,USD,594.28,3.77%,Crecimiento,Financiero
 MSFT,Microsoft Corp.,1.07541,0.0,,Hapi,USD,568.94,3.61%,Crecimiento,Tecnologia
 HCA,HCA Healthcare,0.70429,0.0,,Hapi,USD,322.95,2.05%,Defensiva,Salud
-LAUR,Laureate Education,5.34556,0.0,,Hapi,USD,206.39,1.31%,Crecimiento,Educacion
-META,Meta Platforms,0.26677,0.0,,Hapi,USD,189.22,1.20%,Crecimiento,Tecnologia
+LAUR,Laureate Education,2.74556,0.0,,Hapi,USD,118.393,1.31%,Crecimiento,Educacion
+META,Meta Platforms,0.08677,0.0,,Hapi,USD,78.351454,1.20%,Crecimiento,Tecnologia
 NU,Nu Holdings,12.51417,0.0,,Hapi,USD,182.2,1.16%,Global ex-EE.UU.,Financiero LatAm
 CB,Chubb Ltd.,0.44922,0.0,,Hapi,USD,161.62,1.03%,Defensiva,Financiero
-BKCH,Bitwise Crypto,2.8954,0.0,,Hapi,USD,161.12,1.02%,Crecimiento,Blockchain
+BKCH,Bitwise Crypto,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Blockchain
 RTX,RTX Corp.,0.79391,0.0,,Hapi,USD,153.94,0.98%,Defensiva,Industrial
 DXCM,DexCom Inc.,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Salud
 VWO,Vanguard FTSE Emerging Markets,1.95748,0.0,,Hapi,USD,113.59,0.72%,Global ex-EE.UU.,Mercados Emergentes
@@ -51,13 +51,13 @@ SETM,Sprott Energy Transition Materials ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Materi
 MP,MP Materials Corp.,0.0,0.0,,Watchlist,USD,0.0,0%,Materias Primas,Tierras Raras / Imanes
 LYSDY,Lynas Rare Earths ADR,0.0,0.0,,Watchlist,USD,0.0,0%,Materias Primas,Tierras Raras / Imanes
 MTRN,Materion Corp.,0.0,0.0,,Watchlist,USD,0.0,0%,Sectorial,Materiales Avanzados
-IFRA,iShares Global Infrastructure,0.0,0.0,,Watchlist,USD,0.0,0%,Defensiva,Infraestructura
+IFRA,iShares Global Infrastructure,1.69987,58.8277,2026-11-02,Hapi,USD,100,0%,Defensiva,Infraestructura
 ASML,ASML Holding,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Tecnologia
 ICLN,iShares Global Clean Energy ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Sectorial,Energia Limpia
 ACWI,iShares MSCI ACWI ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Global
 BMRN,BioMarin Pharmaceutical,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Biotecnologia
 ENPH,Enphase Energy,0.0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Energia Renovable
-IDU,iShares U.S. Utilities ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Defensiva,Utilities
+IDU,iShares U.S. Utilities ETF,1.8304,109.2652,2026-10-27,Hapi,USD,200,0%,Defensiva,Utilities
 IEFA,iShares Core MSCI EAFE ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Global ex-EE.UU.,Internacional
 JNJ,Johnson & Johnson,0.0,0.0,,Watchlist,USD,0.0,0%,Defensiva,Salud
 MCHI,iShares MSCI China ETF,0.0,0.0,,Watchlist,USD,0.0,0%,Global ex-EE.UU.,China
@@ -76,3 +76,7 @@ BATT,Invesco Battery ETF,0,0.0,,Watchlist,USD,0.0,0%,Crecimiento,Baterias
 GD,General Dynamics Corporation,0.28899,346.0307,2026-10-21,Hapi,USD,100,,Sectorial,Industrial (auto)
 SNA,Snap-on Incorporated,0.2715,368.316,2026-10-21,Hapi,USD,100,,Sectorial,Industrial (auto)
 VST,Vistra Corp.,0.96056,156.1585,2026-10-21,Hapi,USD,150,,Defensiva,Servicios públicos (auto)
+EWZ,iShares MSCI Brazil ETF,4.2909,34.9577,2026-10-27,Hapi,USD,150,,Crecimiento,Focused Region (auto)
+TSM,Taiwan Semiconductor Manufacturing Company Limited,0.23265,429.8202,2026-10-27,Hapi,USD,100,,Global ex-EE.UU.,Tecnología (auto)
+XP,XP Inc.,0.0,0.0,2026-10-27,Watchlist,USD,0.0,0%,Global ex-EE.UU.,Financiero (auto)
+DRAM,Roundhill Memory ETF,0.0,0.0,2026-11-03,Watchlist,USD,0.0,0%,Crecimiento,Technology (auto)

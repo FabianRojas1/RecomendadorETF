@@ -1,5 +1,5 @@
 {
-  "actualizado": "2026-10-25T13:30:49",
+  "actualizado": "2026-11-08T15:43:46",
   "procesadas": {
     "1a1549bb38284668": {
       "cantidad": 4.79099,
@@ -60,6 +60,84 @@
       "fecha": "2026-10-21",
       "operacion": "compra",
       "ticker": "LLY"
+    },
+    "1a17da088e441cff": {
+      "cantidad": 4.2909,
+      "fecha": "2026-10-27",
+      "operacion": "compra",
+      "ticker": "EWZ"
+    },
+    "1a17da152cfec4ab": {
+      "cantidad": 0.23265,
+      "fecha": "2026-10-27",
+      "operacion": "compra",
+      "ticker": "TSM"
+    },
+    "1a17da1ce4929cfb": {
+      "cantidad": 1.8304,
+      "fecha": "2026-10-27",
+      "operacion": "compra",
+      "ticker": "IDU"
+    },
+    "1a17e6be5a47149c": {
+      "cantidad": 18.57849,
+      "fecha": "2026-10-27",
+      "operacion": "compra",
+      "ticker": "XP"
+    },
+    "1a182cb92b48e181": {
+      "cantidad": 18.57849,
+      "fecha": "2026-10-28",
+      "operacion": "venta",
+      "ticker": "XP"
+    },
+    "1a19d3cd8e32eed0": {
+      "cantidad": 0.1,
+      "fecha": "2026-11-02",
+      "operacion": "venta",
+      "ticker": "META"
+    },
+    "1a19d3d8431e052f": {
+      "cantidad": 1.0,
+      "fecha": "2026-11-02",
+      "operacion": "venta",
+      "ticker": "BKCH"
+    },
+    "1a19d4d77132cbf0": {
+      "cantidad": 1.69987,
+      "fecha": "2026-11-02",
+      "operacion": "compra",
+      "ticker": "IFRA"
+    },
+    "1a1a20d84362eaa1": {
+      "cantidad": 2.08734,
+      "fecha": "2026-11-03",
+      "operacion": "compra",
+      "ticker": "DRAM"
+    },
+    "1a1b14cf00eb49d8": {
+      "cantidad": 2.08734,
+      "fecha": "2026-11-06",
+      "operacion": "venta",
+      "ticker": "DRAM"
+    },
+    "1a1b14eedb711a5f": {
+      "cantidad": 2.6,
+      "fecha": "2026-11-06",
+      "operacion": "venta",
+      "ticker": "LAUR"
+    },
+    "1a1b150164e41e61": {
+      "cantidad": 1.8954,
+      "fecha": "2026-11-06",
+      "operacion": "venta",
+      "ticker": "BKCH"
+    },
+    "1a1b152a11e1994e": {
+      "cantidad": 0.08,
+      "fecha": "2026-11-06",
+      "operacion": "venta",
+      "ticker": "META"
     }
   }
 }
