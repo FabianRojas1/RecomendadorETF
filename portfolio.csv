@@ -1,7 +1,7 @@
 ticker,asset_name,quantity,entry_price,entry_date,broker,currency,current_value,pct_of_total_portfolio,asset_type,asset_subtype
 SPY,SPDR S&P 500 ETF,2.91248,0.0,,Hapi,USD,2222.89,14.10%,Crecimiento,Indexado
 XLV,Health Care Select Sector SPDR,10.87476,0.0,,Hapi,USD,1921.35,12.19%,Defensiva,Salud
-QQQ,Invesco QQQ Trust,2.23458,0.0,,Hapi,USD,1586.1,10.06%,Crecimiento,Tecnologia
+QQQ,Invesco QQQ Trust,2.53136,0.0,,Hapi,USD,1786.1,10.06%,Crecimiento,Tecnologia
 MA,Mastercard Inc.,0.9626,0.0,,Hapi,USD,594.28,3.77%,Crecimiento,Financiero
 MSFT,Microsoft Corp.,1.07541,0.0,,Hapi,USD,568.94,3.61%,Crecimiento,Tecnologia
 HCA,HCA Healthcare,0.70429,0.0,,Hapi,USD,322.95,2.05%,Defensiva,Salud
@@ -80,3 +80,5 @@ EWZ,iShares MSCI Brazil ETF,4.2909,34.9577,2026-10-27,Hapi,USD,150,,Crecimiento,
 TSM,Taiwan Semiconductor Manufacturing Company Limited,0.23265,429.8202,2026-10-27,Hapi,USD,100,,Global ex-EE.UU.,Tecnología (auto)
 XP,XP Inc.,0.0,0.0,2026-10-27,Watchlist,USD,0.0,0%,Global ex-EE.UU.,Financiero (auto)
 DRAM,Roundhill Memory ETF,0.0,0.0,2026-11-03,Watchlist,USD,0.0,0%,Crecimiento,Technology (auto)
+NVDA,NVIDIA Corporation,1.15437,173.2532,2026-11-11,Hapi,USD,200,,Crecimiento,Tecnología (auto)
+ADP,"Automatic Data Processing, Inc.",0.32903,303.916,2026-11-11,Hapi,USD,100,,Crecimiento,Tecnología (auto)

@@ -1,5 +1,5 @@
 {
-  "actualizado": "2026-11-08T15:43:46",
+  "actualizado": "2026-11-15T16:00:49",
   "procesadas": {
     "1a1549bb38284668": {
       "cantidad": 4.79099,
@@ -138,6 +138,24 @@
       "fecha": "2026-11-06",
       "operacion": "venta",
       "ticker": "META"
+    },
+    "1a1c5ed4507389aa": {
+      "cantidad": 0.29678,
+      "fecha": "2026-11-10",
+      "operacion": "compra",
+      "ticker": "QQQ"
+    },
+    "1a1cb254e69aa78d": {
+      "cantidad": 1.15437,
+      "fecha": "2026-11-11",
+      "operacion": "compra",
+      "ticker": "NVDA"
+    },
+    "1a1cb8bb3365b6b3": {
+      "cantidad": 0.32903,
+      "fecha": "2026-11-11",
+      "operacion": "compra",
+      "ticker": "ADP"
     }
   }
 }
